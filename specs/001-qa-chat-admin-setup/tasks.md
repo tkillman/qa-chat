@@ -28,11 +28,11 @@ description: "QA Chat 관리자 및 초기 설정 구현 작업 목록"
 
 **목적**: 프로젝트 초기화 및 기본 구조
 
-- [ ] T001 프로젝트 구조 생성 (src/, tests/, specs/ 디렉토리)
-- [ ] T002 [P] Python 3.11+ 및 의존성 설치 (Gradio, ChromaDB, Langfuse, LangChain)
-- [ ] T003 [P] pytest 및 테스트 설정 구성
-- [ ] T004 [P] .gitignore 업데이트 (ChromaDB 캐시, __pycache__, .env)
-- [ ] T005 src/config.py에 설정 (패스워드=1234, 유사도_임계값=0.7) 정의
+- [x] T001 프로젝트 구조 생성 (src/, tests/, specs/ 디렉토리)
+- [x] T002 [P] Python 3.11+ 및 의존성 설치 (Gradio, ChromaDB, Langfuse, LangChain)
+- [x] T003 [P] pytest 및 테스트 설정 구성
+- [x] T004 [P] .gitignore 업데이트 (ChromaDB 캐시, __pycache__, .env)
+- [x] T005 src/config.py에 설정 (패스워드=1234, 유사도_임계값=0.7) 정의
 
 ---
 
@@ -42,13 +42,13 @@ description: "QA Chat 관리자 및 초기 설정 구현 작업 목록"
 
 **⚠️ 중요**: 이 단계가 완료되어야 사용자 스토리 작업 시작 가능
 
-- [ ] T006 src/models/qa_item.py 생성 (질문, 답변, 임베딩, 메타데이터 데이터 클래스)
-- [ ] T007 [P] src/services/file_service.py - init.txt 읽기/쓰기 유틸리티 구현
-- [ ] T008 [P] src/services/embedding_service.py - 임베딩 생성 서비스 (LangChain 경유)
-- [ ] T009 [P] src/services/chromadb_service.py - ChromaDB 유틸리티 (초기화, 검색, 업데이트, 삭제)
-- [ ] T010 src/services/langfuse_service.py - Langfuse 추적 래퍼 구현
-- [ ] T011 [P] tests/unit/test_file_service.py 작성 (init.txt 읽기/쓰기 테스트)
-- [ ] T012 [P] tests/contract/test_chromadb_contract.py - ChromaDB 계약 테스트 (검색, 임베딩 임계값)
+- [x] T006 src/models/qa_item.py 생성 (질문, 답변, 임베딩, 메타데이터 데이터 클래스)
+- [x] T007 [P] src/services/file_service.py - init.txt 읽기/쓰기 유틸리티 구현
+- [x] T008 [P] src/services/embedding_service.py - 임베딩 생성 서비스 (LangChain 경유)
+- [x] T009 [P] src/services/chromadb_service.py - ChromaDB 유틸리티 (초기화, 검색, 업데이트, 삭제)
+- [x] T010 src/services/langfuse_service.py - Langfuse 추적 래퍼 구현
+- [x] T011 [P] tests/unit/test_file_service.py 작성 (init.txt 읽기/쓰기 테스트)
+- [x] T012 [P] tests/contract/test_chromadb_contract.py - ChromaDB 계약 테스트 (검색, 임베딩 임계값)
 
 **체크포인트**: Foundational 완료 - 모든 사용자 스토리 작업 시작 가능
 
@@ -64,17 +64,17 @@ description: "QA Chat 관리자 및 초기 설정 구현 작업 목록"
 
 > **참고: 구현 전에 다음 테스트 작성 및 실패 확인**
 
-- [ ] T013 [P] [US1] tests/integration/test_initial_load.py - init.txt 없음 → 빈 ChromaDB 테스트
-- [ ] T014 [P] [US1] tests/integration/test_initial_load.py - init.txt 있음 → 데이터 로드 테스트
-- [ ] T015 [US1] tests/integration/test_initial_load.py - init.txt 형식 오류 → 기본값 처리 테스트
+- [x] T013 [P] [US1] tests/integration/test_initial_load.py - init.txt 없음 → 빈 데이터 테스트
+- [x] T014 [P] [US1] tests/integration/test_initial_load.py - init.txt 있음 → 데이터 로드 테스트
+- [x] T015 [US1] tests/integration/test_initial_load.py - init.txt 형식 오류 → 기본값 처리 테스트
 
 ### US1 구현
 
-- [ ] T016 src/main.py에 초기화 함수 생성 (on_startup hook)
-- [ ] T017 [US1] src/services/init_loader.py - init.txt에서 ChromaDB로 로드하는 로직 구현
-- [ ] T018 [US1] src/main.py의 on_startup에서 T017 호출하도록 연결
-- [ ] T019 [US1] Langfuse로 초기 로드 이벤트 추적 (로드된 항목 수, 소요 시간)
-- [ ] T020 [US1] 에러 처리: init.txt 손상 시 로그 및 빈 상태로 시작
+- [x] T016 src/main.py에 초기화 함수 생성 (on_startup hook)
+- [x] T017 [US1] src/services/init_loader.py - init.txt에서 ChromaDB로 로드하는 로직 구현
+- [x] T018 [US1] src/main.py의 on_startup에서 T017 호출하도록 연결
+- [x] T019 [US1] Langfuse로 초기 로드 이벤트 추적 (로드된 항목 수, 소요 시간)
+- [x] T020 [US1] 에러 처리: init.txt 손상 시 로그 및 빈 상태로 시작
 
 **체크포인트**: US1 완료 - app 시작 시 ChromaDB 초기화 작동
 
@@ -90,23 +90,24 @@ description: "QA Chat 관리자 및 초기 설정 구현 작업 목록"
 
 > **참고: 구현 전에 다음 테스트 작성 및 실패 확인**
 
-- [ ] T021 [P] [US2] tests/unit/test_auth.py - 올바른 패스워드 검증 테스트
-- [ ] T022 [P] [US2] tests/unit/test_auth.py - 틀린 패스워드 검증 테스트
-- [ ] T023 [US2] tests/integration/test_admin_login.py - Gradio 로그인 화면 상태 관리 테스트
+- [x] T021 [P] [US2] tests/unit/test_auth.py - 올바른 패스워드 검증 테스트 (12개 테스트)
+- [x] T022 [P] [US2] tests/unit/test_auth.py - 틀린 패스워드 검증 테스트
+- [x] T023 [US2] tests/integration/test_admin_login.py - Gradio 로그인 화면 상태 관리 테스트 (12개 테스트)
 
 ### US2 구현
 
-- [ ] T024 [P] [US2] src/services/auth_service.py - 패스워드 검증 로직
-- [ ] T025 [US2] src/ui/admin_login_ui.py - Gradio 로그인 화면 컴포넌트 구현
-- [ ] T026 [US2] src/ui/admin_login_ui.py - 상태 관리 (is_authenticated, session)
-- [ ] T027 [US2] src/main.py에 로그인 UI 통합 및 라우팅
-- [ ] T028 [US2] Langfuse로 로그인 시도 추적 (성공/실패)
+- [x] T024 [P] [US2] src/services/auth_service.py - 패스워드 검증 로직
+- [x] T025 [US2] src/main.py - Gradio 로그인 UI 컴포넌트 구현
+- [x] T026 [US2] src/main.py - 상태 관리 (admin_logged_in)
+- [x] T027 [US2] src/main.py - 로그인 UI 통합 및 라우팅
+- [x] T028 [US2] Langfuse로 로그인 시도 추적 (성공/실패)
 
 **체크포인트**: US2 완료 - 관리자 로그인 작동, 인증 후 화면 전환
 
 ---
 
 ## Phase 5: User Story 3 - ChromaDB 업데이트 (우선순위: P2)
+
 
 **목표**: 관리자가 질문/답변 입력 후 ChromaDB 및 init.txt 업데이트
 

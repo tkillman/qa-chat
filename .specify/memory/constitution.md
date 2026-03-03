@@ -1,50 +1,126 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!-- 
+동기화 영향 보고서
+- 버전: (초기) → 1.0.0 (헌법 초기 채택)
+- 핵심 원칙: 5개 (관찰 가능성 우선, 벡터 인식 데이터 계약, 사용자 중심 UI, 테스트 주도 개발, 버전 관리 및 주요 변경사항)
+- 추가된 섹션: 기술 스택, 개발 워크플로우
+- 채택일: 2026-03-03
+-->
 
-## Core Principles
+# QA Chat 헌법
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+## 핵심 원칙
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### I. 관찰 가능성 우선
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+모든 기능은 반드시 Langfuse를 통한 구조화된 로깅으로 계측되어야 합니다. 추적(Trace)은 반드시 다음을 포함해야 합니다:
+- 요청/응답 생명주기 (입력 → 검색 → 생성 → 출력)
+- 벡터 검색 쿼리 및 검색 결과 (ChromaDB 작업)
+- 지연시간 및 토큰 사용량 지표 (LLM 성능 추적)
+- 스택 트레이스를 포함한 오류 이벤트
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+근거: Langfuse는 핵심 인프라이며, 모든 AI/RAG 작업은 관찰 가능성이 없으면 불투명합니다. 디버그 능력은 포괄적인 추적에 달려 있습니다.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### II. 벡터 인식 데이터 계약
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+벡터 임베딩 및 검색 작업은 반드시 다음을 정의하는 명시적 계약을 가져야 합니다:
+- 임베딩 모델 및 버전
+- 유사도 임계값 및 순위 결정 전략
+- 문서의 청크 크기 및 겹침
+- 검색 결과가 없을 때의 폴백 동작
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+근거: ChromaDB 기반 검색은 계약이 명시적일 때만 결정적입니다. 계약 위반은 침묵하는 정확성 실패(오류 없이 잘못된 답변)를 유발합니다.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+### III. 사용자 중심 UI
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+모든 사용자 상호작용은 반드시 다음과 함께 Gradio 컴포넌트를 통해 구현되어야 합니다:
+- 명확한 입력 검증 (인라인 오류 메시지 표시)
+- 일관된 상태 관리 (고아 요청 없음)
+- 접근성 준수 (레이블, ARIA 힌트 적절히 포함)
+- 장시간 실행 작업에 대한 실시간 피드백 (진행 표시기)
 
-## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
+근거: Gradio는 배포를 단순화합니다. 품질은 백엔드 우아함이 아닌 사용자 경험으로 판단됩니다.
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+### IV. 테스트 주도 개발 (비협상적)
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+테스트는 반드시 구현 전에 작성하고 승인되어야 합니다:
+- 벡터 검색 로직에 대한 단위 테스트 (ChromaDB 모의)
+- RAG 파이프라인에 대한 통합 테스트 (실제 ChromaDB 인스턴스)
+- LLM 통합에 대한 계약 테스트 (모의 또는 예산 제한 API)
+- Gradio 워크플로우에 대한 UI 테스트 (필요시 Selenium 또는 Playwright)
+
+근거: TDD는 검색 실패, 임베딩 불일치 또는 UI 상태 오류로 인한 침묵하는 실패를 방지합니다. Red-Green-Refactor 사이클이 강제됩니다.
+
+### V. 버전 관리 및 주요 변경사항
+
+API 계약 및 임베딩 모델은 의미적 버전 관리(MAJOR.MINOR.PATCH)를 따릅니다:
+- MAJOR: 임베딩 모델 변경, 검색 알고리즘 변경, 스키마 주요 변경
+- MINOR: 새로운 검색 파라미터, 새로운 벡터 데이터베이스 필드, 새로운 UI 컴포넌트
+- PATCH: 성능 개선, 버그 수정, 리팩토링
+
+모든 주요 변경사항은 반드시 마이그레이션 설명서를 포함해야 합니다 (예: 재임베딩 가이드, 검색 점수 재교정).
+
+근거: ChromaDB 벡터는 일단 생성되면 불변입니다. 스키마 변경에는 명시적 마이그레이션이 필요합니다.
+
+## 기술 스택
+
+**언어**: Python 3.11+  
+**UI**: Gradio (웹 인터페이스)  
+**벡터 저장소**: ChromaDB (임베딩 + 검색)  
+**관찰 가능성**: Langfuse (추적 로깅, LLM 관찰 가능성)  
+**테스팅**: pytest (단위 + 통합), Gradio 테스트 스위트  
+**LLM 통합**: [공급업체 미정 - OpenAI, Anthropic, 로컬 LLM, 또는 TODO] LangChain 또는 LiteLLM 경유  
+**저장소**: [애플리케이션 데이터베이스 미정 - SQLite, PostgreSQL, 또는 TODO] 세션 관리용
+
+## 개발 워크플로우
+
+1. **기능 계획**:
+   - 사용자 스토리를 포함한 spec.md 작성 (독립적, 테스트 가능한 슬라이스)
+   - 기능이 검색 로직에 닿을 경우 벡터 계약 정의
+   - Langfuse 계측 포인트 제안
+
+2. **테스트 구현**:
+   - 먼저 단위 테스트 작성 (ChromaDB 모의, LLM 모의)
+   - 실제 ChromaDB에 대한 통합 테스트 작성
+   - Gradio 컴포넌트가 새로울 경우 UI 테스트
+
+3. **구현 및 관찰 가능성**:
+   - 모든 중요 지점에 Langfuse span을 포함하여 기능 구현
+   - 테스트 통과 확인 (Red-Green-Refactor 활성화)
+   - 검색 동작이 변경될 경우 벡터 계약 업데이트
+
+4. **코드 리뷰**:
+   - 모든 원칙 요구사항이 충족되었는지 확인 (관찰 가능성, 계약, UI 명확성)
+   - 새 코드에 대해 테스트 커버리지 ≥ 80% 확인
+   - 주요 변경사항이 마이그레이션 경로를 가지고 있는지 검증
+
+5. **배포**:
+   - 임베딩 모델이 업그레이드된 경우 문서 재임베딩
+   - 프로덕션에서 Langfuse 추적이 표시되는지 확인
+   - Langfuse 대시보드를 통해 검색 관련성 지표 모니터링
+
+## 거버넌스
+
+**헌법은 모든 다른 관행을 대체합니다**: 이 5가지 원칙은 협상 불가능한 기본값입니다. 이를 위반하는 모든 기능에는 명시적 정당화가 포함된 서면 예외(GitHub 이슈로 제출)가 필요합니다.
+
+**수정 절차**:
+1. GitHub 이슈로 변경 제안 (그것을 동기부여한 PR에 대한 링크)
+2. 팀 합의 필수 (일방적 변경 불가)
+3. 새 버전으로 constitution.md 업데이트
+4. 영향받는 다운스트림 파일로 템플릿 업데이트 전파
+5. main으로 병합; 병합 시 채택됨
+
+**버전 관리 정책**: 헌법 버전은 MAJOR.MINOR.PATCH를 따릅니다
+- MAJOR: 원칙 제거 또는 핵심 동작의 재정의
+- MINOR: 새로운 원칙, 새로운 섹션, 실질적 지침 확장
+- PATCH: 표현 명확화, 오타 수정, 예시 업데이트
+
+**준수 검토**: 모든 풀 요청은 반드시 다음을 확인해야 합니다:
+- Langfuse 추적 존재 및 의미 있음 (관찰 가능성 우선)
+- 해당될 경우 벡터 계약이 문서화됨 (벡터 인식 데이터 계약)
+- Gradio 컨텍스트에서 UI 변경 테스트 (사용자 중심 UI)
+- 구현 전 테스트 작성됨 (테스트 주도 개발)
+- 버전 범프가 정당화됨 (버전 관리 및 주요 변경사항)
+
+복잡성 위반 (예: 원칙 준수를 유지하면서 구현하기에 너무 큰 기능)은 반드시 팀 논의를 위해 GitHub 이슈로 상향보고되어야 합니다.
+
+**버전**: 1.0.0 | **채택일**: 2026-03-03 | **최종 수정**: 2026-03-03

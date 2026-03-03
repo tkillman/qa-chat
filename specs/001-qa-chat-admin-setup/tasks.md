@@ -169,10 +169,10 @@ description: "QA Chat 관리자 및 초기 설정 구현 작업 목록"
 **목적**: 다중 스토리에 영향을 주는 개선사항
 
 - [ ] T050 [P] docs/README.md - 로컬 개발 환경 설정, 실행 방법 작성
-- [ ] T051 [P] specs/001-qa-chat-admin-setup/quickstart.md - 빠른 시작 가이드
-- [ ] T052 specs/001-qa-chat-admin-setup/data-model.md - 최종 데이터 모델 문서화
-- [ ] T053 [P] tests/unit/ 및 tests/integration/ 추가 엣지 케이스 테스트
-- [ ] T054 Performance 최적화: ChromaDB 쿼리 속도, 임베딩 캐싱
+- [x] T051 [P] specs/001-qa-chat-admin-setup/quickstart.md - 빠른 시작 가이드
+- [x] T052 specs/001-qa-chat-admin-setup/data-model.md - 최종 데이터 모델 문서화
+- [x] T053 [P] tests/unit/ 및 tests/integration/ 추가 엣지 케이스 테스트
+- [x] T054 Performance 최적화: ChromaDB 쿼리 속도, 임베딩 캐싱
 - [ ] T055 예외 처리 강화: 네트워크 오류, ChromaDB 손상, 임베딩 모델 로드 실패
 - [ ] T056 [P] 전체 통합 테스트 (app 시작 → 로그인 → Q&A 입력 → 사용자 질문 전체 흐름)
 - [ ] T057 보안: 패스워드 해싱 (선택, MVP 이후), 관리자 세션 암호화

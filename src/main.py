@@ -2,6 +2,12 @@
 QA Chat 메인 애플리케이션 - Gradio UI
 헌법 원칙: UI는 Gradio 사용, TDD, 관찰성
 """
+import os
+import sys
+
+if __package__ is None or __package__ == "":
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import gradio as gr
 import logging
 from src.services.init_loader import get_init_loader
@@ -270,6 +276,7 @@ class QAChatApp:
             share: Gradio 공유 링크 생성 여부
         """
         self.interface = self.create_interface()
+        self.interface.queue(default_concurrency_limit=20)
         
         # 앱 선입 이벤트 등록 (on_startup은 Gradio 3.50+ 문법)
         logger.info("Launching Gradio interface...")

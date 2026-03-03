@@ -1,9 +1,10 @@
 """
 임베딩 생성 서비스 - LangChain/LiteLLM 경유
 """
-from typing import List
+from typing import List, Optional
 import logging
 from src.config import EMBEDDING_MODEL
+from src.services.cache_service import CacheService, get_cache_service
 
 logger = logging.getLogger(__name__)
 
@@ -11,13 +12,15 @@ logger = logging.getLogger(__name__)
 class EmbeddingService:
     """텍스트를 벡터로 변환하는 서비스"""
     
-    def __init__(self, model_name: str = EMBEDDING_MODEL):
+    def __init__(self, model_name: str = EMBEDDING_MODEL, cache_service: Optional[CacheService] = None):
         """임베딩 서비스 초기화
         
         Args:
             model_name: 사용할 임베딩 모델 이름 (기본: config.EMBEDDING_MODEL)
+            cache_service: 캐시 서비스 (기본: 싱글톤)
         """
         self.model_name = model_name
+        self.cache_service = cache_service or get_cache_service()
         self._embeddings = None
         self._initialize_embeddings()
     
@@ -49,12 +52,21 @@ class EmbeddingService:
             raise ValueError("Text cannot be empty")
         
         try:
+            # 캐시 확인
+            cached_embedding = self.cache_service.get_embedding(text)
+            if cached_embedding is not None:
+                logger.debug("Embedding cache hit")
+                return cached_embedding
+
             # TODO: research.md에서 최종 결정된 모델로 구현
             # 예: from langchain.embeddings import HuggingFaceEmbeddings
             # embedding = self._embeddings.embed_query(text)
             
             # 임시 좀플레이스홀더 (1536 차원, OpenAI 기준)
             embedding = [0.0] * 1536
+
+            # 캐시 저장
+            self.cache_service.set_embedding(text, embedding)
             
             logger.debug(f"Generated embedding for text (length: {len(text)})")
             return embedding

@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  qa-chat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: qa-chat:latest
+    container_name: qa-chat
+    ports:
+      - "7860:7860"
+    environment:
+      - GRADIO_SERVER_NAME=0.0.0.0
+      - GRADIO_SERVER_PORT=7860
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-1234}
+      - SIMILARITY_THRESHOLD=${SIMILARITY_THRESHOLD:-0.7}
+      - CACHE_MAX_SIZE=${CACHE_MAX_SIZE:-5000}
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7860/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped

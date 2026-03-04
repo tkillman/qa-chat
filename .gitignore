@@ -48,6 +48,18 @@ htmlcov/
 .tox/
 .hypothesis/
 
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+
+# Project specific
+.chroma/
+.env
+.env.local
+.env.*.local
+debug_search.py
+.specify/
 # ChromaDB
 .chroma/
 chroma_data/

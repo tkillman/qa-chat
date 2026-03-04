@@ -15,4 +15,4 @@ COPY . .
 
 EXPOSE 7860
 
-CMD ["python", "src/main.py"]
+CMD ["python", "app.py"]

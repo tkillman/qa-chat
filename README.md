@@ -150,13 +150,39 @@ LOG_LEVEL=INFO
 
 ## 실행 방법
 
-### 개발 환경에서 실행
+### 로컬 환경에서 실행 (권장)
+
+```bash
+# 프로젝트 루트에서 실행
+python app.py
+```
+
+또는 구 방식:
 
 ```bash
 python src/main.py
 ```
 
 그러면 Gradio 인터페이스가 자동으로 시작되며, 기본 URL은 `http://localhost:7860`입니다.
+
+### Docker로 실행
+
+```bash
+# Docker 이미지 빌드
+docker build -t qa-chat .
+
+# 컨테이너 실행
+docker run -p 7860:7860 \
+  -e ADMIN_PASSWORD=1234 \
+  -e SIMILARITY_THRESHOLD=0.7 \
+  qa-chat
+```
+
+### Docker Compose로 실행
+
+```bash
+docker-compose up
+```
 
 ### 공유 링크와 함께 실행
 
@@ -165,6 +191,85 @@ python -c "from src.main import QAChatApp; import asyncio; app = QAChatApp(); as
 ```
 
 > **참고**: `share=True`일 때는 공개 URL이 생성되지만, 보안 주의 필요.
+
+---
+
+## 🚀 Hugging Face Spaces 배포
+
+### 배포 구조 확인
+
+이 프로젝트는 Hugging Face Spaces 배포에 최적화되어 있습니다:
+
+- ✅ `app.py` - 루트 디렉토리의 엔트리포인트
+- ✅ `requirements.txt` - 의존성 명시
+- ✅ `.gitignore` - 불필요한 파일 제외
+- ✅ `README.md` - 메타데이터 포함
+
+### 배포 단계
+
+1. **Hugging Face 저장소 생성**
+   - [Hugging Face Hub](https://huggingface.co/spaces)에서 새 Space 생성
+   - Owner 선택 > 저장소 이름 입력 > Space 생성
+
+2. **저장소 설정 (README.md 메타데이터)**
+   ```yaml
+   ---
+   title: QA Chat
+   emoji: 🚀
+   colorFrom: gray
+   colorTo: purple
+   sdk: gradio
+   sdk_version: 6.8.0
+   app_file: app.py
+   pinned: false
+   license: mit
+   ---
+   ```
+   > 현재 README.md 상단에 이미 설정되어 있습니다.
+
+3. **코드 푸시**
+   ```bash
+   git remote add huggingface https://huggingface.co/spaces/{username}/{space-name}
+   git push huggingface main
+   ```
+
+4. **환경 변수 설정**
+   - Space 설정(⚙️) → Secrets and variables
+   - 다음 변수 추가:
+     ```
+     ADMIN_PASSWORD=<strong-password>
+     SIMILARITY_THRESHOLD=0.7
+     LANGFUSE_API_KEY=<your-api-key> (선택사항)
+     ```
+
+5. **배포 확인**
+   - Space가 자동으로 빌드 및 배포됨
+   - `https://huggingface.co/spaces/{username}/{space-name}`에서 확인
+
+### 배포 후 데이터 관리
+
+**데이터 초기화:**
+- `data/init.txt`에 Q&A 데이터 추가
+- 다음 포맷으로 저장 (JSON Lines):
+  ```json
+  {"question": "질문1", "answer": "답변1"}
+  {"question": "질문2", "answer": "답변2"}
+  ```
+
+**지속성:**
+- ChromaDB 데이터는 Space 재시작 시 초기화됨
+- 영구 저장을 위해 HF datasets 또는 외부 DB 연동 필요
+
+### 트러블슈팅
+
+**문제**: 관리자 기능이 작동하지 않음
+- **해결**: Secrets에서 `ADMIN_PASSWORD` 올바르게 설정 확인
+
+**문제**: 데이터가 로드되지 않음
+- **해결**: `data/init.txt` 파일 존재 및 형식 확인 (JSON Lines)
+
+**문제**: 느린 응답 속도
+- **해결**: 서버 스펙 업그레이드 또는 유사도 임계값 조정
 
 ---
 
@@ -215,6 +320,7 @@ pytest tests/ -v --tb=short -x  # -x: 첫 실패 시 중단
 
 ```
 qa-chat/
+├── app.py                          # Hugging Face Spaces 엔트리포인트
 ├── src/
 │   ├── models/
 │   │   └── qa_item.py              # Q&A 데이터 모델
@@ -227,7 +333,7 @@ qa-chat/
 │   │   ├── qa_update_service.py    # Q&A 추가/수정
 │   │   ├── user_search_service.py  # 질문 검색
 │   │   └── langfuse_service.py     # 관찰성 로깅
-│   ├── main.py                     # Gradio 메인 앱
+│   ├── main.py                     # Gradio 메인 앱 (핵심 로직)
 │   └── config.py                   # 설정 관리
 ├── tests/
 │   ├── unit/                       # 단위 테스트
@@ -238,9 +344,12 @@ qa-chat/
 ├── .chroma/                        # ChromaDB 저장소
 ├── requirements.txt                # 의존성 명세
 ├── pytest.ini                      # pytest 설정
+├── Dockerfile                      # Docker 이미지 정의
+├── docker-compose.yml              # Docker Compose 설정
 ├── .env                            # 환경 변수 (미포함)
 ├── .env.example                    # 환경 변수 템플릿
 ├── .gitignore                      # git 무시 파일
+├── .dockerignore                   # Docker 무시 파일
 └── README.md                       # 이 파일
 
 ```

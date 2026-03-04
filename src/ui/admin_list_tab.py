@@ -128,6 +128,7 @@ def render_qa_cards(items: List[QAListItem], visible: bool = True) -> Tuple[str,
             }
         };
     }
+    </script>
     
     <div style="display: flex; flex-direction: column; gap: 16px; max-height: 600px; overflow-y: auto; padding-right: 10px;">
     '''
@@ -250,56 +251,58 @@ def create_admin_list_tab():
                     delete_confirm_yes = gr.Button("예", variant="stop")
                     delete_confirm_no = gr.Button("아니오", variant="secondary")
             
-            # 목록 표시 영역
-            qa_list_html = gr.HTML(
-                value="<div style='text-align: center; padding: 40px; color: #999;'>로딩 중...</div>"
-            )
+            # 초기 로드 함수 (컴포넌트 생성 전에 정의)
+            def load_list(page: int, per_page: int) -> Tuple[str, str, str, int]:
+                """목록 로드 함수
+                
+                Args:
+                    page: 페이지 번호
+                    per_page: 페이지당 항목 수
+                    
+                Returns:
+                    (카드 HTML, 페이지 정보, 총 항목 수 텍스트, 현재 페이지)
+                """
+                try:
+                    view_state = service.list_items(page=page, items_per_page=per_page)
+                    
+                    if view_state.has_error():
+                        # 오류 상태
+                        html = render_empty_message(view_state.get_display_message())
+                        return html, "페이지 1/1", "오류 발생", 1
+                    
+                    if view_state.is_empty:
+                        # 빈 목록
+                        html = render_empty_message(view_state.get_display_message())
+                        return html, "페이지 1/1", "총 0개의 항목", 1
+                    
+                    # 정상 표시
+                    html, _ = render_qa_cards(view_state.items, visible=True)
+                    page_info_text = view_state.pagination.get_page_info_text()
+                    total_items_text = view_state.pagination.get_total_items_text()
+                    
+                    return html, page_info_text, total_items_text, page
+                    
+                except Exception as e:
+                    logger.error(f"목록 로드 실패: {e}", exc_info=True)
+                    html = render_empty_message(f"목록 로드 중 오류 발생: {str(e)}")
+                    return html, "페이지 1/1", "오류 발생", 1
+            
+            # 초기 데이터 로드
+            initial_html, initial_page_info, initial_total, initial_page = load_list(1, 50)
+            
+            # 목록 표시 영역 (초기값 포함)
+            qa_list_html = gr.HTML(value=initial_html)
             
             # 페이징 정보 및 컨트롤
             with gr.Row():
                 prev_btn = gr.Button("◀ 이전", scale=1, variant="secondary")
                 with gr.Column(scale=2, min_width=0):
-                    page_info = gr.Markdown("페이지 1/1", elem_classes="page-info-center")
+                    page_info = gr.Markdown(initial_page_info, elem_classes="page-info-center")
                 next_btn = gr.Button("다음 ▶", scale=1, variant="secondary")
             
             # 전체 항목 수 표시
-            total_items_md = gr.Markdown("총 0개의 항목")
-        
-        # 초기 로드 함수
-        def load_list(page: int, per_page: int) -> Tuple[str, str, str, int]:
-            """목록 로드 함수
-            
-            Args:
-                page: 페이지 번호
-                per_page: 페이지당 항목 수
-                
-            Returns:
-                (카드 HTML, 페이지 정보, 총 항목 수 텍스트, 현재 페이지)
-            """
-            try:
-                view_state = service.list_items(page=page, items_per_page=per_page)
-                
-                if view_state.has_error():
-                    # 오류 상태
-                    html = render_empty_message(view_state.get_display_message())
-                    return html, "페이지 1/1", "오류 발생", 1
-                
-                if view_state.is_empty:
-                    # 빈 목록
-                    html = render_empty_message(view_state.get_display_message())
-                    return html, "페이지 1/1", "총 0개의 항목", 1
-                
-                # 정상 표시
-                html, _ = render_qa_cards(view_state.items, visible=True)
-                page_info_text = view_state.pagination.get_page_info_text()
-                total_items_text = view_state.pagination.get_total_items_text()
-                
-                return html, page_info_text, total_items_text, page
-                
-            except Exception as e:
-                logger.error(f"목록 로드 실패: {e}", exc_info=True)
-                html = render_empty_message(f"목록 로드 중 오류 발생: {str(e)}")
-                return html, "페이지 1/1", "오류 발생", 1
+            total_items_md = gr.Markdown(initial_total)
+
         
         def open_delete_dialog(qa_id: str, state: Dict[str, Any]):
             """삭제 확인 다이얼로그 열기 (카드 버튼에서 호출)"""
@@ -378,15 +381,9 @@ def create_admin_list_tab():
                 failed_state,
             )
         
-        # 초기값 로드 (페이지당 50개 고정)
+        # 상태 초기값 설정
         items_per_page.value = 50
-        initial_html, initial_page_info, initial_total, initial_page = load_list(1, 50)
-        
-        # 컴포넌트 초기값 업데이트
-        qa_list_html.value = initial_html
-        page_info.value = initial_page_info
-        total_items_md.value = initial_total
-        current_page.value = initial_page
+        current_page.value = 1
         
         # 이벤트 핸들러 등록
         # refresh_btn.click (50개 고정)

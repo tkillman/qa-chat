@@ -148,3 +148,98 @@ class TestQAUpdateIntegration:
         answer, similarity = restarted_app.search_answer("Restart Q")
 
         assert "New Answer" in answer or answer == "답변을 찾을 수 없습니다"
+
+class TestLangfuseDeleteSpan:
+    """Langfuse 삭제 이벤트 span 추적 테스트 (T046, FR-010)"""
+    
+    def test_delete_qa_item_langfuse_span(self):
+        """목표: 삭제 시 Langfuse trace가 생성되고 기록됨"""
+        from src.services.qa_delete_service import QADeleteService
+        from src.models.qa_delete_models import QADeleteRequest
+        from unittest.mock import Mock, patch
+        
+        # QADeleteService 싱글톤 초기화
+        QADeleteService._instance = None
+        qa_delete_service = QADeleteService()
+        
+        # Mock 의존성
+        mock_chromadb = Mock()
+        mock_langfuse_client = Mock()
+        mock_langfuse_service = Mock()
+        
+        # Mock trace context manager
+        mock_trace = Mock()
+        mock_trace.__enter__ = Mock(return_value=mock_trace)
+        mock_trace.__exit__ = Mock(return_value=False)
+        mock_langfuse_client.trace.return_value = mock_trace
+        mock_langfuse_service.get_client.return_value = mock_langfuse_client
+        
+        # 서비스 의존성 주입
+        qa_delete_service.chromadb_service = mock_chromadb
+        qa_delete_service.langfuse_service = mock_langfuse_service
+        
+        # 삭제 요청
+        request = QADeleteRequest(
+            qa_id="test_qa_001",
+            admin_user="test_admin"
+        )
+        
+        # 삭제 실행
+        result = qa_delete_service.delete_qa_item(request)
+        
+        # 검증 1: 삭제 성공
+        assert result.success is True
+        assert result.qa_id == "test_qa_001"
+        
+        # 검증 2: Langfuse trace가 생성됨
+        assert mock_langfuse_client.trace.called
+        
+        # 검증 3: Trace 호출 인자 확인
+        trace_call_args = mock_langfuse_client.trace.call_args
+        assert trace_call_args is not None
+        
+        # 검증 4: Trace 메타데이터 확인
+        trace_kwargs = trace_call_args[1]
+        assert trace_kwargs["name"] == "delete_qa_item"
+        assert trace_kwargs["input"]["qa_id"] == "test_qa_001"
+        assert trace_kwargs["input"]["admin_user"] == "test_admin"
+        
+        # 검증 5: Trace output이 설정됨
+        assert mock_trace.output is not None
+        assert mock_trace.output["success"] is True
+        assert "삭제되었습니다" in mock_trace.output["message"]
+    
+    def test_delete_qa_item_langfuse_span_without_client(self):
+        """목표: Langfuse client가 없어도 동작함 (graceful degradation)"""
+        from src.services.qa_delete_service import QADeleteService
+        from src.models.qa_delete_models import QADeleteRequest
+        from unittest.mock import Mock
+        
+        # QADeleteService 싱글톤 초기화
+        QADeleteService._instance = None
+        qa_delete_service = QADeleteService()
+        
+        # Mock 의존성 (Langfuse client 없음)
+        mock_chromadb = Mock()
+        mock_langfuse_service = Mock()
+        mock_langfuse_service.get_client.return_value = None  # 클라이언트 없음
+        
+        # 서비스 의존성 주입
+        qa_delete_service.chromadb_service = mock_chromadb
+        qa_delete_service.langfuse_service = mock_langfuse_service
+        
+        # 삭제 요청
+        request = QADeleteRequest(
+            qa_id="test_qa_002",
+            admin_user="test_admin"
+        )
+        
+        # 삭제 실행 (예외 없음)
+        result = qa_delete_service.delete_qa_item(request)
+        
+        # 검증 1: 여전히 성공
+        assert result.success is True
+        assert result.qa_id == "test_qa_002"
+        
+        # 검증 2: ChromaDB 삭제는 여전히 호출됨
+        mock_chromadb.delete.assert_called_once_with("test_qa_002")

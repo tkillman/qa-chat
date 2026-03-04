@@ -3,6 +3,7 @@ Q&A 항목 삭제 서비스
 """
 import logging
 from typing import Optional
+from datetime import datetime
 
 from src.models.qa_delete_models import QADeleteRequest, QADeleteResult
 
@@ -69,15 +70,68 @@ class QADeleteService:
             if not request.qa_id or not request.admin_user:
                 raise ValueError("qa_id와 admin_user는 필수입니다")
             
-            # ChromaDB에서 삭제
-            self.chromadb_service.delete(request.qa_id)
+            # Langfuse trace 시작 (FR-010)
+            langfuse_client = self.langfuse_service.get_client()
+            trace_name = "delete_qa_item"
+            trace_kwargs = {
+                "name": trace_name,
+                "input": {
+                    "qa_id": request.qa_id,
+                    "admin_user": request.admin_user
+                },
+                "metadata": {
+                    "action": "delete",
+                    "entity": "qa_item",
+                    "timestamp": datetime.now().isoformat()
+                }
+            }
             
-            # Langfuse에 기록
-            self.langfuse_service.log_qa_deleted(
-                qa_id=request.qa_id,
-                admin_user=request.admin_user,
-                timestamp=request.timestamp
-            )
+            # Langfuse client가 생성되었으면 trace 사용, 아니면 스킵
+            if langfuse_client:
+                with langfuse_client.trace(**trace_kwargs) as trace:
+                    # ChromaDB에서 삭제
+                    self.chromadb_service.delete(request.qa_id)
+                    
+                    # Langfuse에 기록
+                    self.langfuse_service.log_qa_deleted(
+                        qa_id=request.qa_id,
+                        admin_user=request.admin_user,
+                        timestamp=request.timestamp
+                    )
+                    
+                    logger.info(f"Q&A 항목 삭제됨: {request.qa_id} by {request.admin_user}")
+                    
+                    result = QADeleteResult(
+                        success=True,
+                        qa_id=request.qa_id,
+                        message=f"Q&A 항목이 성공적으로 삭제되었습니다"
+                    )
+                    
+                    # Trace 출력 설정
+                    trace.output = {
+                        "success": result.success,
+                        "message": result.message,
+                        "qa_id": result.qa_id
+                    }
+                    
+                    return result
+            else:
+                # Langfuse가 없으면 기본 동작
+                self.chromadb_service.delete(request.qa_id)
+                
+                self.langfuse_service.log_qa_deleted(
+                    qa_id=request.qa_id,
+                    admin_user=request.admin_user,
+                    timestamp=request.timestamp
+                )
+                
+                logger.info(f"Q&A 항목 삭제됨: {request.qa_id} by {request.admin_user}")
+                
+                return QADeleteResult(
+                    success=True,
+                    qa_id=request.qa_id,
+                    message=f"Q&A 항목이 성공적으로 삭제되었습니다"
+                )
             
             logger.info(f"Q&A 항목 삭제됨: {request.qa_id} by {request.admin_user}")
             

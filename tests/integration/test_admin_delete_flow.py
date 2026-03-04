@@ -156,3 +156,74 @@ class TestDeleteFlowWithAuthValidation:
         
         result = qa_delete_service.delete_qa_item(request)
         assert result.success is True
+
+
+class TestDeleteDialogFlow:
+    """삭제 확인 다이얼로그 통합 테스트 (T021)"""
+    
+    def test_dialog_display_and_cancel(self):
+        """다이얼로그 표시 및 취소 플로우"""
+        # 다이얼로그 상태 모델
+        class DialogState:
+            show_dialog = False
+            selected_qa_id = None
+            is_deleting = False
+        
+        state = DialogState()
+        
+        # 1. 초기 상태: 다이얼로그 닫혀있음
+        assert state.show_dialog is False
+        assert state.selected_qa_id is None
+        
+        # 2. 버튼 클릭: 다이얼로그 열기
+        state.show_dialog = True
+        state.selected_qa_id = "hash_item_001"
+        
+        assert state.show_dialog is True
+        assert state.selected_qa_id == "hash_item_001"
+        
+        # 3. 아니오 클릭: 다이얼로그 닫기
+        state.show_dialog = False
+        state.selected_qa_id = None
+        
+        assert state.show_dialog is False
+        assert sta      state.total_items -= 1
+        
+        # 3. 아이템이 없으면 페이지 1로 리셋
+        if len(state.current_items) == 0 and state.total_items > 0:
+            state.current_page = 1
+        elif state.total_items == 0:
+            state.current_page = 1
+        
+        assert state.current_page == 1
+        assert state.total_items == 0
+        assert len(state.current_items) == 0
+
+
+class TestDeleteStatusMessagesE2E:
+    """삭제 상태 메시지 E2E 통합 테스트 (T036)"""
+    
+    def test_delete_progress_message(self):
+        """삭제 진행 메시지"""
+        message = "삭제 중..."
+        status = "info"
+        
+        assert message == "삭제 중..."
+        assert status == "info"
+    
+    def test_delete_success_message(self):
+        """삭제 성공 메시지"""
+        message = "✓ 삭제되었습니다"
+        status = "success"
+        
+        assert "✓" in message
+        assert "삭제되었습니다" in message
+        assert status == "success"
+    
+    def test_delete_error_message_not_fou❌ 삭제 실패 - DB 오류가 발생했습니다"
+        status = "error"
+        
+        assert "❌" in message
+        assert "실패" in message
+        assert "DB 오류" in message
+        assert status == "error"

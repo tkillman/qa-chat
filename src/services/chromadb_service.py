@@ -192,6 +192,35 @@ class ChromaDBService:
             logger.error(f"Error updating QA item: {e}")
             raise RuntimeError(f"Failed to update item: {e}") from e
     
+    def delete(self, qa_id: str) -> None:
+        """ID로 항목 삭제
+        
+        Args:
+            qa_id: 삭제할 Q&A 항목의 Hash ID
+            
+        Raises:
+            KeyError: 항목을 찾을 수 없는 경우
+            RuntimeError: 삭제 작업 실패
+        """
+        try:
+            if not qa_id:
+                raise ValueError("qa_id는 빈 값이 될 수 없습니다")
+            
+            # 항목 존재 여부 확인
+            result = self.collection.get(ids=[qa_id])
+            if not result or not result.get("ids"):
+                raise KeyError(f"항목을 찾을 수 없습니다: {qa_id}")
+            
+            # 항목 삭제
+            self.collection.delete(ids=[qa_id])
+            logger.info(f"Deleted QA item: {qa_id}")
+            
+        except KeyError:
+            raise
+        except Exception as e:
+            logger.error(f"Error deleting QA item {qa_id}: {e}")
+            raise RuntimeError(f"Failed to delete item: {e}") from e
+    
     def delete_qa_item(self, question: str) -> bool:
         """질문 기반으로 항목 삭제
         

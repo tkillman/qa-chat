@@ -23,11 +23,11 @@
 
 **목적**: 프로젝트 초기화 및 기본 구조
 
-- [ ] T001 데이터 모델 파일 생성: `src/models/qa_delete_models.py`
-- [ ] T002 서비스 파일 생성: `src/services/qa_delete_service.py`
-- [ ] T003 테스트 파일 생성: `tests/unit/test_qa_delete_service.py`
-- [ ] T004 [P] 통합 테스트 파일 생성: `tests/integration/test_admin_delete_flow.py`
-- [ ] T005 [P] 계약 테스트 생성: `tests/contract/test_chromadb_delete.py`
+- [x] T001 데이터 모델 파일 생성: `src/models/qa_delete_models.py`
+- [x] T002 서비스 파일 생성: `src/services/qa_delete_service.py`
+- [x] T003 테스트 파일 생성: `tests/unit/test_qa_delete_service.py`
+- [x] T004 [P] 통합 테스트 파일 생성: `tests/integration/test_admin_delete_flow.py`
+- [x] T005 [P] 계약 테스트 생성: `tests/contract/test_chromadb_delete.py`
 
 ---
 

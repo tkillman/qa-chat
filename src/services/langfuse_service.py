@@ -155,6 +155,22 @@ class LangfuseService:
             **(context or {})
         })
     
+    def log_qa_deleted(self, qa_id: str, admin_user: str, timestamp: Any) -> None:
+        """Q&A 항목 삭제 추적 (Feature 002)
+        
+        Args:
+            qa_id: 삭제된 Q&A 항목 ID
+            admin_user: 삭제 작업 수행 관리자
+            timestamp: 삭제 시간
+        """
+        self.log_event("qa_deleted", {
+            "event_type": "qa_deleted",
+            "qa_id": qa_id,
+            "admin_user": admin_user,
+            "timestamp": str(timestamp),
+            "success": True
+        })
+    
     def log_performance(self, operation: str, duration_ms: float) -> None:
         """성능 메트릭 로깅
         

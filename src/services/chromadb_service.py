@@ -138,7 +138,7 @@ class ChromaDBService:
             results = self.collection.query(
                 query_texts=[query],
                 n_results=top_k,
-                include=["documents", "metadatas", "distances"]
+                include=["documents", "metadatas", "distances", "ids"]
             )
             
             # 결과 변환 및 임계값 필터링 (FR-004 참고: 유사도 0.7 이상)
@@ -152,7 +152,7 @@ class ChromaDBService:
                     if similarity >= SIMILARITY_THRESHOLD:
                         metadata = results["metadatas"][0][i] if results["metadatas"] else {}
                         output.append({
-                            "question": results["ids"][0][i],  # 질문 ID
+                            "question": results["documents"][0][i],  # 질문 텍스트
                             "answer": metadata.get("answer", ""),  # 메타데이터에서 답변 추출
                             "similarity": round(similarity, 4),
                             "metadata": metadata

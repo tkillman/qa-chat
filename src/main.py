@@ -68,6 +68,7 @@ class QAChatApp:
         Returns:
             gr.Blocks 인터페이스
         """
+        # CSS는 launch()에서 전달할 예정
         with gr.Blocks(title="QA Chat") as interface:
             gr.Markdown("# 📚 QA Chat")
             gr.Markdown("질문에 대한 답변을 제공하는 AI 챗봇")
@@ -325,12 +326,38 @@ class QAChatApp:
         Args:
             share: Gradio 공유 링크 생성 여부
         """
+        custom_css = """
+        /* 탭 텍스트 크기 증가 */
+        .tab-nav button {
+            font-size: 18px !important;
+            font-weight: 600 !important;
+            padding: 12px 24px !important;
+        }
+        
+        /* 탭 컨텐츠 패딩 */
+        .tab-content-padding {
+            padding: 24px !important;
+        }
+        
+        /* 페이징 정보 중앙 정렬 */
+        .page-info-center {
+            text-align: center !important;
+        }
+        
+        /* 페이지당 항목 수와 새로고침 버튼 우측 정렬, 10px 간격 */
+        .control-row-right {
+            display: flex !important;
+            gap: 10px !important;
+            justify-content: flex-end !important;
+        }
+        """
+        
         self.interface = self.create_interface()
         self.interface.queue(default_concurrency_limit=20)
         
         # 앱 선입 이벤트 등록 (on_startup은 Gradio 3.50+ 문법)
         logger.info("Launching Gradio interface...")
-        self.interface.launch(share=share, theme=gr.themes.Soft())
+        self.interface.launch(share=share, theme=gr.themes.Soft(), css=custom_css)
 
 
 async def create_app():

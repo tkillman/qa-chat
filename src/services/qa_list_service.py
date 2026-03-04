@@ -52,12 +52,15 @@ class QAListService:
                     include=["documents", "metadatas"]
                 )
                 
+                # docs, metas, ids의 개수가 일치하는지 확인
+                docs = results.get("documents", [])
+                metas = results.get("metadatas", [])
+                ids = results.get("ids", [])
+                
+                logger.debug(f"ChromaDB results - docs: {len(docs)}, metas: {len(metas)}, ids: {len(ids)}")
+                
                 # ChromaDB 결과를 QAListItem으로 변환
-                for doc, metadata, id in zip(
-                    results.get("documents", []),
-                    results.get("metadatas", []),
-                    results.get("ids", [])
-                ):
+                for doc, metadata, id in zip(docs, metas, ids):
                     try:
                         item = QAListItem.from_chromadb_result(doc, metadata, id)
                         all_items.append(item)

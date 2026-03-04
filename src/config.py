@@ -27,8 +27,8 @@ MAX_ADMIN_ANSWER_LENGTH = int(os.getenv("MAX_ADMIN_ANSWER_LENGTH", "2000"))
 # init.txt 경로
 INIT_FILE_PATH = os.getenv("INIT_FILE_PATH", "data/init.txt")
 
-# Embedding 모델 (기본값: OpenAI, 추후 research.md에서 결정)
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
+# Embedding 설정 (FR-013: ChromaDB 기본 임베딩 함수)
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "chromadb_default")
 
 # 로깅
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

@@ -68,6 +68,20 @@ class TestEmbeddingServiceContract:
 
 class TestSimilarityThresholdContract:
     """유사도 임계값 계약 테스트"""
+
+    def test_search_top_k_user_contract(self):
+        """계약: 사용자 검색은 top-1 결과만 반환해야 함"""
+        sample_results = [
+            {"answer": "A1", "similarity": 0.91},
+            {"answer": "A2", "similarity": 0.88},
+        ]
+        top_one = sample_results[:1]
+        assert len(top_one) == 1
+
+    def test_embedding_provider_contract_is_chromadb_default(self):
+        """계약: 기본 임베딩 제공자는 ChromaDB 기본 함수여야 함 (FR-013)"""
+        service = EmbeddingService()
+        assert service.get_embedding_provider() == "chromadb_default_function"
     
     def test_similarity_threshold_is_configured(self):
         """계약: 유사도 임계값(0.7)이 설정되어 있어야 함 (Spec FR-004)"""

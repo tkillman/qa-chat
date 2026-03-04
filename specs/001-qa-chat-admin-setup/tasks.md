@@ -1,259 +1,185 @@
----
-description: "QA Chat 관리자 및 초기 설정 구현 작업 목록"
----
+# Tasks: QA Chat 관리자 및 초기 설정
 
-# 작업: QA Chat 관리자 및 초기 설정
+**Input**: 설계 문서 from `/specs/001-qa-chat-admin-setup/`  
+**Prerequisites**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/`
 
-**입력**: 설계 문서 from `/specs/001-qa-chat-admin-setup/`  
-**필수 조건**: plan.md (필수), spec.md (필수)
+**Tests**: 명세에 독립 테스트 요구가 있으므로 사용자 스토리별 테스트를 포함한다.  
+**Organization**: 사용자 스토리(US1~US4) 단위로 독립 구현/검증 가능하도록 구성한다.
 
-**테스트**: 각 사용자 스토리별로 필수. 테스트 우선 작성 (TDD).
-
-**구성**: 사용자 스토리별로 작업이 그룹화되어 독립적 구현 및 테스트를 가능하게 합니다.
-
-## 형식: `[ID] [P?] [Story?] Description`
-
-- **[P]**: 병렬 실행 가능 (서로 다른 파일, 의존성 없음)
-- **[Story]**: 사용자 스토리 (예: US1, US2, US3)
-- 정확한 파일 경로 포함
-
-## 경로 규칙
-
-- **단일 프로젝트**: `src/`, `tests/` (저장소 루트)
-- 웹 앱, 모바일 등 조정 불필요
+## Format: `[ID] [P?] [Story] Description`
+- **[P]**: 병렬 가능(다른 파일, 의존성 없음)
+- **[Story]**: `US1`, `US2`, `US3`, `US4`
 
 ---
 
-## Phase 1: Setup (공유 인프라)
+## Phase 1: Setup (Shared Infrastructure)
 
-**목적**: 프로젝트 초기화 및 기본 구조
+**Purpose**: 스펙 확정값과 기본 실행 환경 동기화
 
-- [x] T001 프로젝트 구조 생성 (src/, tests/, specs/ 디렉토리)
-- [x] T002 [P] Python 3.11+ 및 의존성 설치 (Gradio, ChromaDB, Langfuse, LangChain)
-- [x] T003 [P] pytest 및 테스트 설정 구성
-- [x] T004 [P] .gitignore 업데이트 (ChromaDB 캐시, __pycache__, .env)
-- [x] T005 src/config.py에 설정 (패스워드=1234, 유사도_임계값=0.7) 정의
+- [x] T001 `src/config.py`에 확정 상수 정렬 (`MAX_USER_QUESTION_LENGTH=500`, `MAX_ADMIN_QUESTION_LENGTH=500`, `MAX_ADMIN_ANSWER_LENGTH=2000`, `SIMILARITY_THRESHOLD=0.7`)
+- [x] T002 [P] `README.md`와 `QUICKSTART.md`에서 검색 미결과 문구를 `답변을 찾을 수 없습니다`로 통일
+- [x] T003 [P] `tests/conftest.py`에서 `.env` 기본값(`ADMIN_PASSWORD=1234`) 테스트 픽스처 정리
 
 ---
 
-## Phase 2: Foundational (차단 조건)
+## Phase 2: Foundational (Blocking)
 
-**목적**: 모든 사용자 스토리가 의존하는 핵심 인프라
+**Purpose**: 모든 스토리에 공통으로 필요한 인증/저장/관찰성 기반 정리
 
-**⚠️ 중요**: 이 단계가 완료되어야 사용자 스토리 작업 시작 가능
+**⚠️ CRITICAL**: 이 단계 완료 전 사용자 스토리 구현 진행 금지
 
-- [x] T006 src/models/qa_item.py 생성 (질문, 답변, 임베딩, 메타데이터 데이터 클래스)
-- [x] T007 [P] src/services/file_service.py - init.txt 읽기/쓰기 유틸리티 구현
-- [x] T008 [P] src/services/embedding_service.py - 임베딩 생성 서비스 (LangChain 경유)
-- [x] T009 [P] src/services/chromadb_service.py - ChromaDB 유틸리티 (초기화, 검색, 업데이트, 삭제)
-- [x] T010 src/services/langfuse_service.py - Langfuse 추적 래퍼 구현
-- [x] T011 [P] tests/unit/test_file_service.py 작성 (init.txt 읽기/쓰기 테스트)
-- [x] T012 [P] tests/contract/test_chromadb_contract.py - ChromaDB 계약 테스트 (검색, 임베딩 임계값)
+- [x] T004 `src/main.py`에 전역 인증 상태(`admin_logged_in`) 전이 규칙을 `logged_out ↔ logged_in`으로 명시 정리
+- [x] T005 [P] `src/services/langfuse_service.py`에 공통 이벤트 필드(`event_type`, `success`, `error_message`) 확인/보완
+- [x] T006 [P] `src/services/file_service.py`에서 JSONL 손상 라인 skip + 경고 로그 계약(`storage-contract.md`) 일치 확인
+- [x] T007 `tests/contract/test_chromadb_contract.py`에 임계값 0.7 및 top-1 검색 계약 검증 케이스 추가
+- [x] T008 `src/services/embedding_service.py`에서 ChromaDB 기본 임베딩 함수 사용 계약(FR-013) 명시 및 테스트 가능한 훅 정리
 
-**체크포인트**: Foundational 완료 - 모든 사용자 스토리 작업 시작 가능
+**Checkpoint**: Foundation ready
 
 ---
 
-## Phase 3: User Story 1 - 초기 로딩 (우선순위: P1) 🎯
+## Phase 3: User Story 1 - 초기 로딩 (P1) 🎯 MVP
 
-**목표**: 앱 실행 시 init.txt의 데이터를 ChromaDB에 로드
+**Goal**: 앱 시작 시 `init.txt`를 ChromaDB에 로드하고 즉시 검색 가능 상태 제공  
+**Independent Test**: 파일 있음/없음/손상 케이스에서 초기화 결과가 명세대로 동작
 
-**독립적 테스트**: init.txt가 존재할 때/없을 때 app 시작 시 ChromaDB가 올바르게 초기화되는지 확인 가능
+### Tests (US1)
+- [x] T009 [P] [US1] `tests/integration/test_initial_load.py`에 `init.txt` 존재 시 로드 건수 검증
+- [x] T010 [P] [US1] `tests/integration/test_initial_load.py`에 `init.txt` 미존재 시 빈 상태 시작 검증
+- [x] T011 [US1] `tests/integration/test_initial_load.py`에 손상 라인 skip + 앱 기동 유지 검증
 
-### US1 테스트
+### Implementation (US1)
+- [x] T012 [US1] `src/services/init_loader.py`에서 JSONL 유효 레코드만 적재하도록 예외 처리 정교화
+- [x] T013 [US1] `src/main.py` `on_startup()`에서 로드 결과(건수/시간/성공여부) 로깅 일관화
+- [x] T014 [US1] `src/services/langfuse_service.py`로 startup load 추적 이벤트 연결
 
-> **참고: 구현 전에 다음 테스트 작성 및 실패 확인**
-
-- [x] T013 [P] [US1] tests/integration/test_initial_load.py - init.txt 없음 → 빈 데이터 테스트
-- [x] T014 [P] [US1] tests/integration/test_initial_load.py - init.txt 있음 → 데이터 로드 테스트
-- [x] T015 [US1] tests/integration/test_initial_load.py - init.txt 형식 오류 → 기본값 처리 테스트
-
-### US1 구현
-
-- [x] T016 src/main.py에 초기화 함수 생성 (on_startup hook)
-- [x] T017 [US1] src/services/init_loader.py - init.txt에서 ChromaDB로 로드하는 로직 구현
-- [x] T018 [US1] src/main.py의 on_startup에서 T017 호출하도록 연결
-- [x] T019 [US1] Langfuse로 초기 로드 이벤트 추적 (로드된 항목 수, 소요 시간)
-- [x] T020 [US1] 에러 처리: init.txt 손상 시 로그 및 빈 상태로 시작
-
-**체크포인트**: US1 완료 - app 시작 시 ChromaDB 초기화 작동
+**Checkpoint**: US1 단독 동작 가능
 
 ---
 
-## Phase 4: User Story 2 - 관리자 로그인 (우선순위: P1)
+## Phase 4: User Story 2 - 관리자 로그인/로그아웃 (P1)
 
-**목표**: 패스워드(1234) 검증 후 관리자 화면 진입
+**Goal**: 비밀번호 검증 후 관리자 화면 진입, 로그아웃 시 전역 상태 해제  
+**Independent Test**: 성공/실패/빈 비밀번호/로그아웃 전이가 독립적으로 검증됨
 
-**독립적 테스트**: Gradio 로그인 UI에서 패스워드 입력/검증/화면 전환을 독립적으로 테스트 가능
+### Tests (US2)
+- [x] T015 [P] [US2] `tests/unit/test_auth.py`에 로그인 실패 후 재시도 허용(잠금 없음) 명시 테스트 추가
+- [x] T016 [P] [US2] `tests/integration/test_admin_login.py`에 로그인 성공 시 관리자 컴포넌트 visible 검증
+- [x] T017 [US2] `tests/integration/test_admin_login.py`에 로그아웃 버튼 클릭 후 전역 상태 해제 검증 추가
 
-### US2 테스트
+### Implementation (US2)
+- [x] T018 [US2] `src/main.py`에 관리자 탭 `로그아웃` 버튼 및 콜백 추가
+- [x] T019 [US2] `src/main.py` `admin_login()`/`logout` 콜백을 `contracts/admin-ui-contract.md` 출력 순서와 일치시킴
+- [x] T020 [US2] `src/services/auth_service.py`에서 비밀번호 검증 로직을 `.env` 기본값 규칙과 정렬
+- [x] T021 [US2] `src/services/langfuse_service.py`에 로그인 성공/실패/로그아웃 이벤트 추적 보강
 
-> **참고: 구현 전에 다음 테스트 작성 및 실패 확인**
-
-- [x] T021 [P] [US2] tests/unit/test_auth.py - 올바른 패스워드 검증 테스트 (12개 테스트)
-- [x] T022 [P] [US2] tests/unit/test_auth.py - 틀린 패스워드 검증 테스트
-- [x] T023 [US2] tests/integration/test_admin_login.py - Gradio 로그인 화면 상태 관리 테스트 (12개 테스트)
-
-### US2 구현
-
-- [x] T024 [P] [US2] src/services/auth_service.py - 패스워드 검증 로직
-- [x] T025 [US2] src/main.py - Gradio 로그인 UI 컴포넌트 구현
-- [x] T026 [US2] src/main.py - 상태 관리 (admin_logged_in)
-- [x] T027 [US2] src/main.py - 로그인 UI 통합 및 라우팅
-- [x] T028 [US2] Langfuse로 로그인 시도 추적 (성공/실패)
-
-**체크포인트**: US2 완료 - 관리자 로그인 작동, 인증 후 화면 전환
+**Checkpoint**: US2 단독 동작 가능
 
 ---
 
-## Phase 5: User Story 3 - ChromaDB 업데이트 (우선순위: P2)
+## Phase 5: User Story 3 - 관리자 Q&A 업데이트 (P2)
 
+**Goal**: 관리자 입력으로 ChromaDB + `init.txt` 동시 갱신, 중복 질문 덮어쓰기  
+**Independent Test**: 업데이트 후 재시작 시 반영 유지 + 동일 질문 덮어쓰기 확인
 
-**목표**: 관리자가 질문/답변 입력 후 ChromaDB 및 init.txt 업데이트
+### Tests (US3)
+- [x] T022 [P] [US3] `tests/unit/test_qa_update.py`에 질문/답변 길이 제한(500/2000) 검증 강화
+- [x] T023 [P] [US3] `tests/integration/test_qa_update.py`에 동일 질문 덮어쓰기(정규화 기준) 검증
+- [x] T024 [US3] `tests/integration/test_qa_update.py`에 업데이트 후 재시작 재로딩 검증 보강
 
-**독립적 테스트**: 관리자 화면에서 질문/답변 입력 → DB 업데이트 → init.txt 저장 확인 가능
+### Implementation (US3)
+- [x] T025 [US3] `src/services/qa_update_service.py`에서 입력 검증 규칙을 `data-model.md`와 일치시킴
+- [x] T026 [US3] `src/services/qa_update_service.py`에서 ChromaDB upsert + 파일 반영의 성공/실패 경계 처리 정리
+- [x] T027 [US3] `src/services/file_service.py`에 정규화 question 기준 덮어쓰기 저장 보장
+- [x] T028 [US3] `src/main.py` `update_qa()` 상태 메시지 및 권한 거부 메시지 계약 정렬
+- [x] T029 [US3] `src/services/langfuse_service.py`에 update 성공/실패 이벤트 필드 보강
 
-### US3 테스트
-
-> **참고: 구현 전에 다음 테스트 작성 및 실패 확인**
-
-- [ ] T029 [P] [US3] tests/unit/test_chromadb_update.py - 단일 Q&A 추가 테스트
-- [ ] T030 [P] [US3] tests/unit/test_chromadb_update.py - 중복 질문 처리 테스트
-- [ ] T031 [US3] tests/integration/test_admin_qa_workflow.py - 관리자 UI에서 Q&A 입력 → 저장 전체 흐름
-- [ ] T032 [US3] tests/integration/test_admin_qa_workflow.py - app 재시작 시 저장된 데이터 로드 확인
-
-### US3 구현
-
-- [ ] T033 [P] [US3] src/services/qa_service.py - Q&A 항목 추가/수정/삭제 로직
-- [ ] T034 src/ui/admin_qa_ui.py - 관리자 Q&A 입력 화면 (Gradio 텍스트 박스, 버튼)
-- [ ] T035 [US3] src/ui/admin_qa_ui.py - "DB 업데이트" 버튼 → T033, T007 (service, file_service) 호출
-- [ ] T036 [US3] src/services/qa_service.py에서 ChromaDB 업데이트 (임베딩 생성 → 저장)
-- [ ] T037 [US3] src/services/file_service.py와 연동하여 init.txt 저장
-- [ ] T038 [US3] Langfuse로 각 Q&A 업데이트 추적 (추가/수정/삭제, 임베딩 생성 시간)
-- [ ] T039 [US3] UI 피드백: 업데이트 성공/실패 메시지 표시
-
-**체크포인트**: US3 완료 - 관리자가 Q&A 추가/수정 가능, init.txt + ChromaDB 동기화
+**Checkpoint**: US3 단독 동작 가능
 
 ---
 
-## Phase 6: User Story 4 - 질문 답변 기능 (우선순위: P2)
+## Phase 6: User Story 4 - 사용자 질문 답변 (P2)
 
-**목표**: 사용자 질문 입력 시 ChromaDB에서 검색하여 답변 제공
+**Goal**: 사용자 질문에 대해 임계값 0.7 기준 top-1 답변 반환, 미검색 문구 고정  
+**Independent Test**: 일치/미일치/경계값(0.7) 케이스 독립 검증
 
-**독립적 테스트**: 사용자 UI에서 질문 입력 → 검색 → 답변 표시 확인 가능
+### Tests (US4)
+- [x] T030 [P] [US4] `tests/unit/test_user_search.py`에 threshold=0.7 경계 테스트 추가
+- [x] T031 [P] [US4] `tests/integration/test_user_search_flow.py` 생성: 사용자 탭 검색 end-to-end 테스트
+- [x] T032 [US4] `tests/integration/test_user_search_flow.py`에 미검색 문구 exact match 검증
 
-### US4 테스트
+### Implementation (US4)
+- [x] T033 [US4] `src/services/user_search_service.py` 반환 정책(top-1, threshold 0.7) 명시화
+- [x] T034 [US4] `src/main.py` `search_answer()` 미검색 문구를 exact string으로 고정
+- [x] T035 [US4] `src/main.py` 사용자 질문 길이 초과 메시지 및 예외 경로 통일
+- [x] T036 [US4] `src/services/langfuse_service.py`에 검색 이벤트(질문, 결과유무, 유사도) 추적 보강
 
-> **참고: 구현 전에 다음 테스트 작성 및 실패 확인**
-
-- [ ] T040 [P] [US4] tests/unit/test_qa_search.py - 정확 일치 검색 테스트
-- [ ] T041 [P] [US4] tests/unit/test_qa_search.py - 유사 검색 (유사도 임계값 0.7 이상) 테스트
-- [ ] T042 [P] [US4] tests/unit/test_qa_search.py - 검색 결과 없음 테스트
-- [ ] T043 [US4] tests/integration/test_user_qa_workflow.py - 사용자 UI 질문 입력 → 답변 표시 전체 흐름
-
-### US4 구현
-
-- [ ] T044 [P] [US4] src/services/qa_search_service.py - ChromaDB 검색 로직 (유사도 임계값 적용)
-- [ ] T045 src/ui/user_qa_ui.py - 사용자 질문 입력 화면 (Gradio 텍스트박스, 제출 버튼)
-- [ ] T046 [US4] src/ui/user_qa_ui.py - 질문 제출 → T044 검색 호출
-- [ ] T047 [US4] src/ui/user_qa_ui.py - 답변 표시 (검색 결과 있음 / 없음)
-- [ ] T048 [US4] Langfuse로 모든 사용자 질문 추적 (질문, 검색 결과, 구조, 응답 시간)
-- [ ] T049 [US4] 에러 처리: 검색 실패, 임베딩 오류 시 사용자 친화적 메시지
-
-**체크포인트**: US4 완료 - 사용자가 질문 입력 후 답변 수신 가능
+**Checkpoint**: US4 단독 동작 가능
 
 ---
 
-## Phase 7: Polish & 교차 기능
+## Phase 7: Polish & Cross-Cutting
 
-**목적**: 다중 스토리에 영향을 주는 개선사항
+**Purpose**: 문서/회귀/일관성 마감
 
-- [ ] T050 [P] docs/README.md - 로컬 개발 환경 설정, 실행 방법 작성
-- [x] T051 [P] specs/001-qa-chat-admin-setup/quickstart.md - 빠른 시작 가이드
-- [x] T052 specs/001-qa-chat-admin-setup/data-model.md - 최종 데이터 모델 문서화
-- [x] T053 [P] tests/unit/ 및 tests/integration/ 추가 엣지 케이스 테스트
-- [x] T054 Performance 최적화: ChromaDB 쿼리 속도, 임베딩 캐싱
-- [ ] T055 예외 처리 강화: 네트워크 오류, ChromaDB 손상, 임베딩 모델 로드 실패
-- [ ] T056 [P] 전체 통합 테스트 (app 시작 → 로그인 → Q&A 입력 → 사용자 질문 전체 흐름)
-- [ ] T057 보안: 패스워드 해싱 (선택, MVP 이후), 관리자 세션 암호화
-- [ ] T058 UI/UX: 로딩 상태 표시, 진행 표시기, 사용자 친화적 오류 메시지
+- [x] T037 [P] `specs/001-qa-chat-admin-setup/quickstart.md` 시나리오를 실제 구현 단계와 동기화
+- [x] T038 [P] `README.md` 운영 메모(전역 로그인 상태 특성, 보안 주의) 추가
+- [x] T039 `specs/001-qa-chat-admin-setup/quickstart.md`에 전체 회귀 실행 결과(`pytest -q`) triage 기록
+- [x] T040 `specs/001-qa-chat-admin-setup/contracts/admin-ui-contract.md` 및 `specs/001-qa-chat-admin-setup/contracts/storage-contract.md` 구현 일치 체크리스트 작성
 
 ---
 
-## 의존성 및 실행 순서
+## Dependencies & Execution Order
 
-### Phase 의존성
+### Phase Dependencies
+- Phase 1 → Phase 2 → US(3~6) → Phase 7
+- US1/US2는 Phase 2 완료 후 병렬 가능
+- US3/US4는 Phase 2 완료 후 병렬 가능(단, US3는 관리자 인증 흐름 재사용)
 
-- **Setup (Phase 1)**: 의존성 없음 - 즉시 시작 가능
-- **Foundational (Phase 2)**: Setup 완료 필요 - 모든 사용자 스토리 차단
-- **User Stories (Phase 3~6)**: Foundational 완료 후 시작 가능
-  - US1, US2 동시 진행 가능 (P1, 상호 독립적)
-  - US3, US4 동시 진행 가능 (P2, US1~2 이후)
-- **Polish (Phase 7)**: 모든 사용자 스토리 완료 후
+### Story Dependencies
+- US1: 독립
+- US2: 독립
+- US3: US2 인증 상태를 사용하지만 독립 검증 가능
+- US4: US1 데이터 로딩 결과를 활용하지만 독립 검증 가능
 
-### 사용자 스토리 의존성
+### Dependency Graph
+- Setup → Foundational → {US1, US2} → {US3, US4} → Polish
+- 세부 순서: `T001-T003` → `T004-T008` → (`T009-T014` || `T015-T021`) → (`T022-T029` || `T030-T036`) → `T037-T040`
 
-- **US1 (P1)**: Foundational 완료 후 - 다른 스토리와 독립적
-- **US2 (P1)**: Foundational 완료 후 - 다른 스토리와 독립적
-- **US3 (P2)**: Foundational + US1, US2 완료 후 - US4와 독립적
-- **US4 (P2)**: Foundational + US1 완료 후 - US3와 독립적이나 US1이 필요
-
-### 각 스토리 내부
-
-- 테스트 작성 및 실패 확인
-- 모델 → 서비스 → UI 순서
-- 각 UI 변경 후 Langfuse 추적 통합
-
-### 병렬 기회
-
-- **Setup (Phase 1)**: [P] 표시 작업들 병렬 실행 가능
-- **Foundational (Phase 2)**: [P] 표시 작업들 병렬 실행 가능
-- **Foundational 완료 후**: US1, US2 동시 진행 (다른 팀원)
-- **US1, US2 완료 후**: US3, US4 동시 진행
-- 각 스토리 내 [P] 작업들 병렬 실행
+### Parallel Opportunities
+- `[P]` 항목은 파일 충돌 없이 병렬 수행 가능
+- 테스트 작성(T008~T010, T014~T016, T021~T023, T029~T031)은 각 스토리 내 병렬 가능
 
 ---
 
-## 병렬 예시: US1 (초기 로딩)
+## Parallel Execution Examples by Story
 
-팀원 A, B가 있을 경우:
+### US1 병렬 예시
+- 병렬 1: `T009` + `T010` (`tests/integration/test_initial_load.py` 내 다른 시나리오 섹션)
+- 병렬 2: `T012` (`src/services/init_loader.py`) 와 `T014` (`src/services/langfuse_service.py`)
 
-1. **병렬 실행 (Foundational 완료 후)**:
-   - A: T013 테스트 작성 → T016, T017, T018 구현
-   - B: T014, T015 추가 테스트 작성
-   
-2. **순차 (테스트 완료 후)**:
-   - A: T019, T020 Langfuse 통합 및 에러 처리
-   
-3. **검증**: 전체 통합 테스트
+### US2 병렬 예시
+- 병렬 1: `T015` (`tests/unit/test_auth.py`) + `T016` (`tests/integration/test_admin_login.py`)
+- 병렬 2: `T020` (`src/services/auth_service.py`) + `T021` (`src/services/langfuse_service.py`)
 
----
+### US3 병렬 예시
+- 병렬 1: `T022` (`tests/unit/test_qa_update.py`) + `T023` (`tests/integration/test_qa_update.py`)
+- 병렬 2: `T026` (`src/services/qa_update_service.py`) + `T027` (`src/services/file_service.py`)
 
-## 병렬 예시: US2 + US3 병렬
-
-팀원 A, B 독립적 진행 (Foundational 완료 후):
-
-**팀원 A (US2 로그인)**:
-T021, T022, T023, T024, T025, T026, T027, T028
-
-**팀원 B (US1 초기 로딩)**:
-T013~T020
-
-→ US1, US2 완료 후 → US3 (Q&A 업데이트) 시작
+### US4 병렬 예시
+- 병렬 1: `T030` (`tests/unit/test_user_search.py`) + `T031` (`tests/integration/test_user_search_flow.py`)
+- 병렬 2: `T033` (`src/services/user_search_service.py`) + `T036` (`src/services/langfuse_service.py`)
 
 ---
 
-## MVP 범위
+## Implementation Strategy
 
-**초기 MVP (US1 + US2만)**:
-- ✅ 앱 시작 시 init.txt 로드
-- ✅ 관리자 로그인 (패스워드 1234)
-- ❌ ChromaDB 업데이트 (나중에)
-- ❌ 사용자 질문 (나중에)
+### MVP First
+1. Phase 1/2 완료
+2. US1 + US2 완료 (초기 로드 + 관리자 인증/로그아웃)
+3. 독립 검증 후 데모
 
-**Full Product (모든 US)**:
-- ✅ 초기 로딩 + 로그인 + 업데이트 + 질문 답변
-
----
-
-**구현 전략**: MVP 먼저 (US1, US2) → 검증 → 사용자 기능 추가 (US3, US4)
+### Incremental Delivery
+1. US3 추가 (관리자 업데이트)
+2. US4 추가 (사용자 검색)
+3. Phase 7 정리 및 전체 회귀

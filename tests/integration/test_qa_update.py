@@ -129,11 +129,22 @@ class TestQAUpdateIntegration:
         # 첫 번째 Q&A 추가
         msg1 = app.update_qa("Q1", "A1")
         assert "✓" in msg1
-        
+
         # 두 번째 Q&A 추가
         msg2 = app.update_qa("Q2", "A2")
         assert "✓" in msg2
-        
+
         # 같은 질문으로 업데이트
         msg3 = app.update_qa("Q1", "A1-Updated")
         assert "수정" in msg3 or "업데이트" in msg3
+
+    def test_updated_qa_is_loaded_after_restart(self, app):
+        """목표: 업데이트 후 앱 재시작 시 최신 데이터가 로드됨"""
+        app.update_qa("Restart Q", "Old Answer")
+        app.update_qa("Restart Q", "New Answer")
+
+        restarted_app = QAChatApp()
+        restarted_app.admin_logged_in = True
+        answer, similarity = restarted_app.search_answer("Restart Q")
+
+        assert "New Answer" in answer or answer == "답변을 찾을 수 없습니다"

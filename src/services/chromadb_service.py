@@ -14,13 +14,29 @@ logger = logging.getLogger(__name__)
 class ChromaDBService:
     """ChromaDB 벡터 저장소 관리 서비스"""
     
+    # 싱글톤 인스턴스 캐시
+    _instances = {}
+    
+    def __new__(cls, persist_dir: str = CHROMA_PERSIST_DIR, collection_name: str = "qa_items"):
+        """싱글톤 패턴: 동일한 persist_dir + collection_name 조합은 같은 인스턴스 반환"""
+        key = (persist_dir, collection_name)
+        if key not in cls._instances:
+            instance = super().__new__(cls)
+            cls._instances[key] = instance
+            instance._initialized = False
+        return cls._instances[key]
+    
     def __init__(self, persist_dir: str = CHROMA_PERSIST_DIR, collection_name: str = "qa_items"):
-        """ChromaDB 서비스 초기화
+        """ChromaDB 서비스 초기화 (최초 1회만 수행)
         
         Args:
             persist_dir: ChromaDB 저장 디렉토리
             collection_name: 컬렉션 이름 (기본: "qa_items")
         """
+        # 이미 초기화된 경우 스킵
+        if self._initialized:
+            return
+        
         self.persist_dir = persist_dir
         self.collection_name = collection_name
         self.embedding_service = EmbeddingService()
@@ -30,16 +46,29 @@ class ChromaDBService:
         self.collection = None
         
         self._initialize_collection()
+        self._initialized = True
     
     def _initialize_collection(self) -> None:
-        """컬렉션 초기화 (존재하지 않으면 생성)"""
+        """컬렉션 초기화 (존재하면 재사용, 손상되면 재생성)"""
         try:
-            # 기존 컬렉션 가져오기 또는 생성
-            self.collection = self.client.get_or_create_collection(
+            # 기존 컬렉션 목록 확인
+            try:
+                existing_collections = self.client.list_collections()
+                for col in existing_collections:
+                    if col.name == self.collection_name:
+                        # 기존 컬렉션 재사용 시도
+                        self.collection = self.client.get_collection(name=self.collection_name)
+                        logger.info(f"Reusing existing collection '{self.collection_name}'")
+                        return
+            except Exception as e:
+                logger.debug(f"Error checking existing collections: {e}")
+            
+            # 새로운 컬렉션 생성
+            self.collection = self.client.create_collection(
                 name=self.collection_name,
                 metadata={"hnsw:space": "cosine"}
             )
-            logger.info(f"Collection '{self.collection_name}' initialized")
+            logger.info(f"Created new collection '{self.collection_name}'")
             
         except Exception as e:
             logger.error(f"Error initializing collection: {e}")
@@ -59,28 +88,25 @@ class ChromaDBService:
             return
         
         try:
-            # 임베딩 생성
-            texts = [item.question for item in items]
-            embeddings = self.embedding_service.embed_texts(texts)
-            
-            # MetaDB에 추가
+            # 메타데이터 준비 (답변 포함)
             ids = [item.get_hash_key() for item in items]
-            # ChromaDB는 비어있지 않은 메타데이터 필요
             metadatas = []
+            documents = [item.question for item in items]  # 임베딩할 텍스트는 질문
+            
             for item in items:
+                # 메타데이터에 답변 저장
                 metadata = item.metadata or {}
-                # 빈 메타데이터에 기본값 추가
                 if not metadata:
-                    metadata = {"source": "system"}
+                    metadata = {}
+                metadata["answer"] = item.answer  # 답변을 메타데이터에 추가
                 metadatas.append(metadata)
             
-            documents = [item.answer for item in items]
-            
+            # ChromaDB 기본 임베딩 함수 사용
+            # documents의 질문 텍스트가 임베딩되고 유사 검색에 사용됨
             self.collection.add(
                 ids=ids,
-                embeddings=embeddings,
-                metadatas=metadatas,
-                documents=documents
+                documents=documents,  # 질문이 임베딩될 텍스트
+                metadatas=metadatas   # 메타데이터에 답변 저장
             )
             
             logger.info(f"Added {len(items)} items to ChromaDB")
@@ -107,12 +133,10 @@ class ChromaDBService:
             raise ValueError("Query cannot be empty")
         
         try:
-            # 쿼리 임베딩 생성
-            query_embedding = self.embedding_service.embed_text(query)
-            
-            # ChromaDB 검색
+            # ChromaDB 기본 임베딩 함수를 사용하여 검색
+            # query_texts를 사용하면 ChromaDB가 자동으로 임베딩 생성
             results = self.collection.query(
-                query_embeddings=[query_embedding],
+                query_texts=[query],
                 n_results=top_k,
                 include=["documents", "metadatas", "distances"]
             )
@@ -126,11 +150,12 @@ class ChromaDBService:
                     similarity = 1 - distance
                     
                     if similarity >= SIMILARITY_THRESHOLD:
+                        metadata = results["metadatas"][0][i] if results["metadatas"] else {}
                         output.append({
-                            "question": results["ids"][0][i],  # 역정규화된 질문 키
-                            "answer": results["documents"][0][i] if results["documents"] else "",
+                            "question": results["ids"][0][i],  # 질문 ID
+                            "answer": metadata.get("answer", ""),  # 메타데이터에서 답변 추출
                             "similarity": round(similarity, 4),
-                            "metadata": results["metadatas"][0][i] if results["metadatas"] else {}
+                            "metadata": metadata
                         })
             
             logger.info(f"Search query '{query}' returned {len(output)} results")
@@ -225,3 +250,19 @@ class ChromaDBService:
             
         except Exception as e:
             logger.warning(f"Error persisting data: {e}")
+
+
+# 글로벌 인스턴스
+_chromadb_service = None
+
+
+def get_chromadb_service() -> ChromaDBService:
+    """ChromaDB 서비스 인스턴스 반환 (싱글톤)
+    
+    Returns:
+        ChromaDBService 인스턴스
+    """
+    global _chromadb_service
+    if _chromadb_service is None:
+        _chromadb_service = ChromaDBService()
+    return _chromadb_service

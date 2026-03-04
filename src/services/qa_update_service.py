@@ -93,27 +93,31 @@ class QAUpdateService:
         try:
             # 질문 정규화 (공백 제거)
             normalized_q = question.strip()
-            
+
             # 기존 항목 여부 확인 (파일에서)
-            try:
-                existing_items = self.file_service.read_qa_items()
-                target_key = normalized_q.lower()
-                is_new = not any(item.get_hash_key() == target_key for item in existing_items)
-            except Exception:
-                is_new = True
-            
+            existing_items = self.file_service.read_qa_items()
+            target_key = normalized_q.lower()
+            is_new = not any(item.get_hash_key() == target_key for item in existing_items)
+
             # QAItem 생성
             item = QAItem(
                 question=normalized_q,
                 answer=answer.strip(),
                 metadata=metadata or {}
             )
-            
-            # 파일에 업데이트 (중복 질문이면 덮어쓰기)
-            self.file_service.update_or_insert_qa_item(item)
-            
-            # ChromaDB에 업데이트
+
+            # ChromaDB 업데이트 먼저 수행
             self.chromadb.update_qa_item(item)
+
+            # 파일 반영 실패 시 이전 상태로 롤백
+            try:
+                self.file_service.update_or_insert_qa_item(item)
+            except Exception as file_error:
+                logger.error(f"File sync failed after ChromaDB update, rolling back ChromaDB: {file_error}")
+                self.chromadb.clear_collection()
+                if existing_items:
+                    self.chromadb.add_qa_items(existing_items)
+                raise
             
             # Langfuse 추적
             self.langfuse.log_qa_update(

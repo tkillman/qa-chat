@@ -45,21 +45,28 @@ class LangfuseService:
     
     def log_event(self, name: str, metadata: Optional[Dict[str, Any]] = None) -> None:
         """이벤트 로깅 (헌법 관찰성 구현)
-        
-        Args:
-            name: 이벤트 이름
-            metadata: 이벤트 메타데이터
+
+        표준 필드:
+        - event_type
+        - success
+        - error_message (오류 시)
         """
+        payload = {
+            "event_type": name,
+            "success": True,
+            "error_message": None,
+            **(metadata or {}),
+        }
+
         if not self.api_key or not self.client:
-            logger.debug(f"Event (no Langfuse): {name}")
+            logger.debug(f"Event (no Langfuse): {payload}")
             return
-        
+
         try:
             # TODO: Langfuse 클라이언트 구현 후 활성화
-            # self.client.log(name=name, metadata=metadata or {})
-            
+            # self.client.log(name=name, metadata=payload)
             logger.debug(f"Logged event to Langfuse: {name}")
-            
+
         except Exception as e:
             logger.warning(f"Error logging event to Langfuse: {e}")
     
@@ -72,6 +79,7 @@ class LangfuseService:
             success: 성공 여부
         """
         self.log_event("initial_load", {
+            "event_type": "initial_load",
             "num_items": num_items,
             "duration_ms": round(duration_ms, 2),
             "success": success
@@ -79,14 +87,24 @@ class LangfuseService:
     
     def log_admin_login(self, success: bool, reason: Optional[str] = None) -> None:
         """관리자 로그인 시도 추적 (US2)
-        
+
         Args:
             success: 성공 여부
             reason: 실패 사유 (성공 시 None)
         """
         self.log_event("admin_login", {
+            "event_type": "admin_login",
             "success": success,
-            "reason": reason
+            "reason": reason,
+            "error_message": None if success else reason
+        })
+
+    def log_admin_logout(self, success: bool = True) -> None:
+        """관리자 로그아웃 이벤트 추적 (US2)."""
+        self.log_event("admin_logout", {
+            "event_type": "admin_logout",
+            "success": success,
+            "error_message": None if success else "logout_failed"
         })
     
     def log_qa_update(self, question_length: int, answer_length: int, is_new: bool) -> None:
@@ -98,6 +116,8 @@ class LangfuseService:
             is_new: 신규 항목 여부 (False면 기존 항목 덮어쓰기)
         """
         self.log_event("qa_update", {
+            "event_type": "qa_update",
+            "success": True,
             "question_length": question_length,
             "answer_length": answer_length,
             "is_new": is_new
@@ -112,6 +132,8 @@ class LangfuseService:
             top_similarity: 최상위 결과의 유사도
         """
         self.log_event("user_search", {
+            "event_type": "user_search",
+            "success": True,
             "question_length": question_length,
             "num_results": num_results,
             "top_similarity": round(top_similarity, 4) if top_similarity else None
@@ -126,6 +148,8 @@ class LangfuseService:
             context: 추가 컨텍스트
         """
         self.log_event("error", {
+            "event_type": "error",
+            "success": False,
             "error_type": error_type,
             "error_message": error_message,
             **(context or {})

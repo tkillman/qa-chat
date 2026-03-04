@@ -46,7 +46,7 @@ class FileService:
                         item = QAItem.from_json_line(line)
                         items.append(item)
                     except ValueError as e:
-                        logger.error(f"Error parsing line {line_num}: {e}")
+                        logger.warning(f"Skipping malformed JSONL line {line_num}: {e}")
                         continue
             
             logger.info(f"Successfully read {len(items)} QA items from {file_path}")

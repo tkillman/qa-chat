@@ -1,391 +1,81 @@
----
-description: "Phase 7 빠른 시작 가이드: Docker 배포 및 성능 테스트"
-date: "2026-03-03"
----
+# Quickstart: QA Chat 관리자 및 초기 설정
 
-# QA Chat Phase 7 빠른 시작 가이드
+## 목적
+이 가이드는 스펙 `001-qa-chat-admin-setup`의 핵심 흐름(초기 로드, 관리자 로그인/로그아웃, Q&A 업데이트, 사용자 검색)을 로컬에서 빠르게 검증한다.
 
-**목표**: Docker로 QA Chat을 배포하고 성능 테스트를 실행하기 (10분)
-
----
-
-## 1. 필수 조건
-
-### 설치 확인
-
+## 1. 환경 준비
 ```bash
-# Docker 확인
-docker --version
-# 출력 예: Docker version 24.0.0
+# 프로젝트 루트
+cd C:/fun/qa-chat
 
-# Docker Compose 확인
-docker-compose --version
-# 출력 예: Docker Compose version 2.20.0
+# 가상환경 활성화 (PowerShell)
+.venv/Scripts/Activate.ps1
 
-# Python (로컬 테스트용)
-python --version
-# 출력 예: Python 3.12.0
+# 의존성 설치
+pip install -r requirements.txt
 ```
 
-### 미설치 시
-- **Windows/Mac**: [Docker Desktop](https://www.docker.com/products/docker-desktop) 설치
-- **Linux**: `sudo apt install docker.io docker-compose`
-
----
-
-## 2. Docker로 실행 (3단계, 2분)
-
-### Step 1: 이미지 빌드
-
+## 2. 필수 설정
 ```bash
-# 프로젝트 루트에서
-docker build -t qa-chat:latest .
-
-# 출력:
-# Step 1/15 : FROM python:3.12-slim
-# ...
-# Successfully built abc123...
-# Successfully tagged qa-chat:latest
+# .env (없으면 기본 1234 사용)
+ADMIN_PASSWORD=1234
+SIMILARITY_THRESHOLD=0.7
 ```
 
-**소요 시간**: ~1분 (처음), ~10초 (캐시)
+`data/init.txt`는 JSONL 형식이어야 한다.
+```json
+{"question":"Python이란?","answer":"프로그래밍 언어입니다"}
+{"question":"Docker란?","answer":"컨테이너 플랫폼입니다"}
+```
 
-### Step 2: 컨테이너 실행
-
+## 3. 앱 실행
 ```bash
-# 방법 A: 직접 docker 명령어
-docker run -p 7860:7860 \
-  -v $(pwd)/data:/app/data \
-  -e ADMIN_PASSWORD=1234 \
-  qa-chat:latest
-
-# 방법 B: docker-compose 사용 (권장)
-docker-compose up -d
-
-# 방법 C (Windows PowerShell): 
-docker run -p 7860:7860 `
-  -v ${pwd}/data:/app/data `
-  -e ADMIN_PASSWORD=1234 `
-  qa-chat:latest
+python src/main.py
 ```
+브라우저에서 `http://127.0.0.1:7860` 접속.
 
-**출력**:
-```
-Application started
-Running on http://0.0.0.0:7860
-```
+## 4. 시나리오 검증
 
-### Step 3: 상태 확인
+### A) 초기 로딩
+- 앱 시작 로그에서 초기 로드 성공/실패 메시지 확인.
+- `init.txt`가 없거나 일부 줄이 손상되어도 앱은 기동되어야 하며 손상 줄은 무시된다.
 
+### B) 관리자 로그인/로그아웃
+- 관리자 탭에서 `1234` 로그인 성공 시 관리자 입력 영역이 표시된다.
+- 잘못된 비밀번호 입력 시 상태 메시지 표시, 관리자 영역은 숨김 유지.
+- 로그아웃 버튼 클릭 시 전역 로그인 상태 해제 및 로그인 화면 복귀.
+
+### C) Q&A 업데이트
+- 관리자 로그인 상태에서 질문/답변 입력 후 업데이트 버튼 클릭.
+- 같은 질문 재입력 시 기존 항목이 덮어쓰기 되어야 한다.
+- 업데이트 후 `data/init.txt`와 ChromaDB 검색 결과가 동일한 최신 값을 반환해야 한다.
+
+### D) 사용자 검색
+- 사용자 탭에서 질문 입력 시 유사도 임계값(0.7) 이상 1건만 반환.
+- 결과 없음 시 정확히 `답변을 찾을 수 없습니다` 반환.
+
+## 5. 테스트 실행 (권장 순서)
 ```bash
-# 방법 A: docker (직접 실행)
-docker ps
-# 또는
-docker logs qa-chat  # 컨테이너 이름으로 로그 확인
+# 빠른 회귀
+pytest tests/integration/test_admin_login.py -q
+pytest tests/integration/test_initial_load.py -q
+pytest tests/integration/test_qa_update.py -q
 
-# 방법 B: docker-compose 사용
-docker-compose ps
-docker-compose logs -f
-
-# 웹 브라우저에서 테스트
-# http://localhost:7860 열기 → Gradio UI 보이면 성공 ✅
+# 전체 테스트
+pytest -q
 ```
 
----
-
-## 3. 성능 테스트 (선택)
-
-### 3.1 부하 테스트 (10명 동시 사용자)
-
-```bash
-# 1. Locust 설치
-pip install locust==2.15.0
-
-# 2. 테스트 파일 생성 (tests/performance/locustfile.py)
-# (아래 샘플 코드 참조)
-
-# 3. 테스트 실행
-locust -f tests/performance/locustfile.py \
-  --host=http://localhost:7860 \
-  --users=10 \
-  --spawn-rate=2 \
-  --run-time=60s
-
-# 4. 결과 해석
-# Requests/sec: 초당 요청 수
-# Response time (50%ile): 중앙값 응답 시간
-# Failure ratio: 실패율 (0% 이상적)
-```
-
-### Locust 샘플 코드
-
-```python
-# tests/performance/locustfile.py
-
-from locust import HttpUser, task, between, events
-import random
-import time
-
-# 테스트 질문 샘플
-QUESTIONS = [
-    "Python이 뭐야?",
-    "Docker는 뭐야?",
-    "Chrome이 뭐야?",
-    "임베딩이 뭐야?",
-    "QA 시스템이 뭐야?",
-]
-
-class QAChatUser(HttpUser):
-    """사용자 시뮬레이션"""
-    
-    wait_time = between(1, 3)  # 요청 사이 1-3초 대기
-    
-    @task(4)
-    def search_answer(self):
-        """사용자 검색 (80% 비율)"""
-        question = random.choice(QUESTIONS)
-        self.client.post("/run/search_answer", json={"data": [question]})
-    
-    @task(1)
-    def admin_login(self):
-        """관리자 로그인 (20% 비율)"""
-        self.client.post("/run/admin_login", json={"data": ["1234"]})
-
-# 테스트 진행률 이벤트 처리
-@events.test_stop.add_listener
-def on_test_stop(runner, **kwargs):
-    print("\n=== Performance Test Results ===")
-    print(f"Total requests: {runner.stats.total.num_requests}")
-    print(f"Failed requests: {runner.stats.total.num_failures}")
-    print(f"Average response time: {runner.stats.total.avg_response_time:.0f}ms")
-    print(f"Max response time: {runner.stats.total.max_response_time:.0f}ms")
-```
-
-### 3.2 응답 시간 측정
-
-```bash
-# curl로 단일 요청 시간 측정
-time curl -X POST http://localhost:7860/run/search_answer \
-  -H "Content-Type: application/json" \
-  -d '{"data": ["테스트 질문"]}'
-
-# 출력:
-# real 0m0.123s   # 실제 소요 시간
-# user 0m0.004s
-# sys  0m0.008s
-```
-
-### 3.3 메모리 및 CPU 모니터링
-
-```bash
-# 방법 A: docker stats (진행 중 모니터링)
-docker stats qa-chat  # Ctrl+C로 종료
-
-# 출력:
-# CONTAINER  CPU %   MEM USAGE / LIMIT
-# qa-chat    2.5%    120MiB / 512MiB
-
-# 방법 B: 단일 스냅샷
-docker stats --no-stream qa-chat
-```
-
-### 3.4 캐시 통계 확인
-
-```bash
-# Gradio의 데이터 끝점 확인
-curl http://localhost:7860/api/predict
-
-# 또는 관리자 API (구현 시 사용 가능)
-curl http://localhost:7860/api/cache-stats
-```
-
----
-
-## 4. 문제 해결
-
-### 포트 충돌
-
-```bash
-# ❌ 오류: "address already in use"
-
-# 해결 방법 1: 포트 변경
-docker run -p 7861:7860 qa-chat:latest
-# http://localhost:7861 로 접근
-
-# 해결 방법 2: 기존 컨테이너 중지
-docker-compose down
-docker ps
-docker stop <container-id>
-```
-
-### 메모리 부족
-
-```bash
-# ❌ 오류: "Out of memory"
-
-# 해결 방법: 메모리 한계 증가
-docker run -m 1g qa-chat:latest  # 1GB로 설정
-
-# docker-compose에서:
-deploy:
-  resources:
-    limits:
-      memory: 1G
-```
-
-### 데이터 지속성 문제
-
-```bash
-# ❌ 컨테이너 재시작 후 데이터 손실
-
-# 확인: 볼륨 마운트 확인
-docker inspect qa-chat | grep -i volumes
-
-# 재설정: 볼륨 마운트 추가
-docker run -v $(pwd)/data:/app/data qa-chat:latest
-```
-
-### 헬스 체크 실패
-
-```bash
-# ❌ "Health status: unhealthy"
-
-# 해결 방법
-docker logs qa-chat  # 로그 확인
-docker exec qa-chat python -c "import requests; requests.get('http://localhost:7860/info')"
-```
-
----
-
-## 5. 개발 모드 (선택)
-
-### 코드 .hot reloading (개발용)
-
-```yaml
-# docker-compose-dev.yml
-version: "3.9"
-
-services:
-  qa-chat:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev  # 개발용 Dockerfile
-    volumes:
-      - .:/app  # 전체 프로젝트 마운트
-      - /app/__pycache__  # 캐시 제외
-    environment:
-      - DEBUG=True
-      - PYTHONUNBUFFERED=1
-    ports:
-      - "7860:7860"
-```
-
-```bash
-# 개발 모드로 실행
-docker-compose -f docker-compose-dev.yml up
-
-# 코드 변경 후 자동 리로드됨
-```
-
----
-
-## 6. 프로덕션 체크리스트
-
-배포 전 확인 사항:
-
-```bash
-# 1. 이미지 빌드
-docker build -t qa-chat:1.0.0 .
-
-# 2. 이미지 스캔 (보안)
-docker scan qa-chat:1.0.0
-
-# 3. 로컬 테스트
-docker run -p 7860:7860 qa-chat:1.0.0
-
-# 4. 부하 테스트 (10+ 사용자)
-locust -f tests/performance/locustfile.py \
-  --host=http://localhost:7860 \
-  --users=10 \
-  --run-time=300s
-
-# 5. 성능 검증
-✅ 평균 응답 시간 <100ms
-✅ 캐시 히트율 >80%
-✅ CPU <50%, 메모리 <400MB
-✅ 실패율 0%
-
-# 6. 데이터 지속성 테스트
-docker-compose down
-docker-compose up
-# data/init.txt 여전히 있는지 확인
-
-# 7. 환경 변수 설정
-✅ ADMIN_PASSWORD 변경 (1234 아님)
-✅ SIMILARITY_THRESHOLD 최적값 (0.7)
-✅ 필요시 LANGFUSE_KEY 설정
-
-# 8. 로그 전석 설정
-✅ 로그 드라이버 구성 (크기 제한)
-✅ 중앙 로깅 설정 (선택)
-```
-
----
-
-## 7. 다음 단계
-
-### Phase 2 구현
-
-```bash
-# 캐시 서비스 구현 확인
-docker exec qa-chat python -c "from src.services.cache_service import CacheService; print('✅ Cache service ready')"
-
-# 성능 메트릭 확인
-docker logs qa-chat | grep -i "cache\|performance"
-
-# 회귀 테스트 (기존 94개 테스트)
-docker exec qa-chat pytest tests/ -v --tb=short
-```
-
-### 모니터링 & 관찰성
-
-```bash
-# Langfuse 통합 확인
-curl http://localhost:7860/api/metrics
-
-# 성능 대시보드 설정 (선택)
-# → Grafana 또는 DataDog 통합
-```
-
----
-
-## 8. 빠른 참조
-
-| 작업 | 명령어 |
-|------|--------|
-| **빌드** | `docker build -t qa-chat:latest .` |
-| **실행** | `docker-compose up -d` |
-| **로그** | `docker-compose logs -f` |
-| **중지** | `docker-compose down` |
-| **상태** | `docker-compose ps` |
-| **테스트** | `docker exec qa-chat pytest tests/` |
-| **부하테스트** | `locust -f tests/performance/locustfile.py --host=http://localhost:7860 --users=10` |
-| **메모리** | `docker stats qa-chat` |
-| **삭제** | `docker system prune -a` |
-
----
-
-## 9. 지원
-
-문제 발생 시:
-
-1. **로그 확인**: `docker-compose logs qa-chat`
-2. **상태 확인**: `docker-compose ps`
-3. **컨테이너 재시작**: `docker-compose restart`
-4. **캐시 정리**: `docker system prune`
-5. **문서 확인**: Phase 1 contracts/ 참조
-
----
-
-**완성**: Phase 7 Phase 1 설계 완료 ✅  
-**다음**: Phase 2 구현 (캐시, Docker, 테스트)
+## 6. 완료 기준
+- 관리자 로그인/로그아웃이 명세대로 동작한다.
+- 검색 결과 없음 문구가 고정 문자열과 정확히 일치한다.
+- 중복 질문 업데이트가 덮어쓰기로 처리된다.
+- Langfuse 추적이 로그인/검색/업데이트/오류 이벤트에 남는다.
+
+## 7. 회귀 실행 결과 (T039)
+- 실행 명령: `python -m pytest -q`
+- 실행 일시: 2026-03-04
+- 결과: `139 passed`
+- Triaging 메모:
+  - 기능 실패 없음
+  - `datetime.utcnow()` 관련 deprecation warning 다수 존재 (`src/utils/cache.py`, `src/models/cache_models.py`)
+  - 본 구현 범위 외 경고로 분리 추적 권장

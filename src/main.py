@@ -37,6 +37,10 @@ class QAChatApp:
         self.langfuse = get_langfuse_service()
         self.interface = None
         self.admin_logged_in = False
+
+    def _set_admin_state(self, is_authenticated: bool) -> None:
+        """전역 관리자 인증 상태 전이 규칙."""
+        self.admin_logged_in = is_authenticated
     
     async def on_startup(self):
         """앱 시작 시 초기 로드 (US1)
@@ -104,40 +108,63 @@ class QAChatApp:
                     placeholder="패스워드 입력",
                 )
                 login_btn = gr.Button("로그인", variant="primary")
+                logout_btn = gr.Button("로그아웃", variant="secondary")
                 login_status = gr.Markdown("", visible=False)
                 
                 # 관리자 패널 (로그인 후 표시, US2에서 구현)
-                with gr.Group(visible=False) as admin_panel:
-                    gr.Markdown("## Q&A 관리")
-                    
-                    question_input = gr.Textbox(
-                        label="질문",
-                        placeholder="새로운 질문을 입력하세요",
-                        lines=2,
-                    )
-                    answer_input = gr.Textbox(
-                        label="답변",
-                        placeholder="답변을 입력하세요",
-                        lines=3,
-                    )
-                    add_btn = gr.Button("추가/수정", variant="primary")
-                    add_status = gr.Textbox(
-                        label="상태",
-                        interactive=False,
-                    )
-                    
-                    # 추가/수정 버튼 클릭 시 동작 (US3에서 구현)
-                    add_btn.click(
-                        fn=self.update_qa,
-                        inputs=[question_input, answer_input],
-                        outputs=[add_status]
-                    )
+                admin_header = gr.Markdown("## Q&A 관리", visible=False)
+
+                question_input = gr.Textbox(
+                    label="질문",
+                    placeholder="새로운 질문을 입력하세요",
+                    lines=2,
+                    visible=False,
+                )
+                answer_input = gr.Textbox(
+                    label="답변",
+                    placeholder="답변을 입력하세요",
+                    lines=3,
+                    visible=False,
+                )
+                add_btn = gr.Button("추가/수정", variant="primary", visible=False)
+                add_status = gr.Textbox(
+                    label="상태",
+                    interactive=False,
+                    visible=False,
+                )
+
+                # 추가/수정 버튼 클릭 시 동작 (US3에서 구현)
+                add_btn.click(
+                    fn=self.update_qa,
+                    inputs=[question_input, answer_input],
+                    outputs=[add_status]
+                )
                 
                 # 로그인 버튼 클릭 시 동작 (US2에서 구현)
                 login_btn.click(
                     fn=self.admin_login,
                     inputs=[password_input],
-                    outputs=[login_status, admin_panel]
+                    outputs=[
+                        login_status,
+                        admin_header,
+                        question_input,
+                        answer_input,
+                        add_btn,
+                        add_status,
+                    ]
+                )
+
+                logout_btn.click(
+                    fn=self.admin_logout,
+                    inputs=[],
+                    outputs=[
+                        login_status,
+                        admin_header,
+                        question_input,
+                        answer_input,
+                        add_btn,
+                        add_status,
+                    ]
                 )
         
         return interface
@@ -151,12 +178,12 @@ class QAChatApp:
         - 유사도 0.7 이상만 반환 (FR-004)
         - 최대 1개 결과만 반환 (FR-009)
         - Langfuse 로깅
-        
+
         Args:
-            question: 사용자 질문 (최대 1024자)
-            
+            question: 사용자 질문 (최대 500자)
+
         Returns:
-            (답변 텍스트, 유사도 점수) 또는 ("작답할 수 없습니다", 0.0)
+            (답변 텍스트, 유사도 점수) 또는 ("답변을 찾을 수 없습니다", 0.0)
         """
         try:
             # 입력값 검증
@@ -165,6 +192,12 @@ class QAChatApp:
                 logger.warning("User search with empty question")
                 return msg, 0.0
             
+            # 길이 제한 검증 (FR-009)
+            if len(question) > MAX_USER_QUESTION_LENGTH:
+                msg = f"질문은 {MAX_USER_QUESTION_LENGTH}자 이내여야 합니다"
+                logger.warning("User search question too long")
+                return msg, 0.0
+
             # 사용자 검색 서비스 호출
             results = self.user_search_service.search_qa(question)
             
@@ -178,7 +211,7 @@ class QAChatApp:
                 return answer, similarity
             else:
                 # 결과 없음
-                msg = "죄송합니다만, 해당 질문에 대한 답변을 찾지 못했습니다."
+                msg = "답변을 찾을 수 없습니다"
                 logger.info(f"No results for user question: '{question[:50]}...'")
                 return msg, 0.0
                 
@@ -201,31 +234,71 @@ class QAChatApp:
             password: 입력한 패스워드
             
         Returns:
-            (상태 메시지, 관리자 패널 표시 여부)
+            로그인 상태 및 관리자 컴포넌트 표시 업데이트 값
         """
+        hidden = gr.update(visible=False)
+
         if not password:
             # 빈 패스워드
             msg = "패스워드를 입력해주세요"
             self.langfuse.log_admin_login(success=False, reason="empty_password")
-            return msg, False
+            return (
+                gr.update(value=msg, visible=True),
+                hidden,
+                hidden,
+                hidden,
+                hidden,
+                hidden,
+            )
         
         # 패스워드 검증
         is_valid = self.auth_service.verify_password(password)
         
         if is_valid:
             # 로그인 성공
-            self.admin_logged_in = True
+            self._set_admin_state(True)
             msg = "✓ 로그인 성공하였습니다"
             self.langfuse.log_admin_login(success=True)
             logger.info("Admin login successful")
-            return msg, True
+            visible = gr.update(visible=True)
+            return (
+                gr.update(value=msg, visible=True),
+                visible,
+                visible,
+                visible,
+                visible,
+                visible,
+            )
         else:
             # 로그인 실패
-            self.admin_logged_in = False
+            self._set_admin_state(False)
             msg = "✗ 패스워드가 틀렸습니다"
             self.langfuse.log_admin_login(success=False, reason="invalid_password")
             logger.warning("Admin login failed")
-            return msg, False
+            return (
+                gr.update(value=msg, visible=True),
+                hidden,
+                hidden,
+                hidden,
+                hidden,
+                hidden,
+            )
+
+    def admin_logout(self) -> tuple:
+        """관리자 로그아웃: 전역 인증 상태 해제 후 로그인 화면 복귀."""
+        self._set_admin_state(False)
+        self.langfuse.log_admin_logout(success=True)
+        logger.info("Admin logout successful")
+
+        hidden = gr.update(visible=False)
+        return (
+            gr.update(value="로그아웃되었습니다", visible=True),
+            hidden,
+            hidden,
+            hidden,
+            hidden,
+            hidden,
+        )
     
     def update_qa(self, question: str, answer: str) -> str:
         """Q&A 추가/수정 (US3)

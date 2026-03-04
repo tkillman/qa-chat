@@ -5,6 +5,7 @@ Spec US2: 패스워드(1234) 검증 후 관리자 화면 진입
 import pytest
 from unittest.mock import patch, MagicMock
 from src.services.auth_service import AuthService
+from src.main import QAChatApp
 
 
 class TestAdminLoginFlow:
@@ -103,6 +104,30 @@ class TestAdminUIStateManagement:
         assert is_valid == True
         assert "성공" in status
         assert visible == True
+
+
+class TestAdminLoginUIContract:
+    """QAChatApp 로그인/로그아웃 UI 계약 테스트"""
+
+    def test_login_success_makes_admin_components_visible(self):
+        app = QAChatApp()
+        result = app.admin_login("1234")
+
+        assert app.admin_logged_in is True
+        assert result[0]["visible"] is True
+        for component_update in result[1:]:
+            assert component_update["visible"] is True
+
+    def test_logout_resets_global_state_and_hides_components(self):
+        app = QAChatApp()
+        app.admin_login("1234")
+
+        result = app.admin_logout()
+
+        assert app.admin_logged_in is False
+        assert result[0]["visible"] is True
+        for component_update in result[1:]:
+            assert component_update["visible"] is False
 
 
 class TestAdminLoginWithLangfuse:

@@ -9,6 +9,7 @@ import logging
 from typing import Dict, List, Optional
 from src.services.chromadb_service import ChromaDBService
 from src.services.langfuse_service import get_langfuse_service
+from src.config import SIMILARITY_THRESHOLD, SEARCH_TOP_K_USER, MAX_USER_QUESTION_LENGTH
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,14 @@ class UserSearchService:
         # 빈 값 또는 공백만 있는지 체크
         if not query.strip():
             return {'valid': False, 'error': '검색어를 입력해주세요'}
-        
+
+        # 길이 제한 체크
+        if len(query) > MAX_USER_QUESTION_LENGTH:
+            return {
+                'valid': False,
+                'error': f'질문은 {MAX_USER_QUESTION_LENGTH}자 이내여야 합니다'
+            }
+
         return {'valid': True}
     
     def search_qa(self, query: str) -> List[Dict]:
@@ -68,14 +76,14 @@ class UserSearchService:
         
         try:
             # ChromaDB에서 최대 1개 결과 검색 (FR-009)
-            results = self.chromadb.search_similar(query, top_k=1)
+            results = self.chromadb.search_similar(query, top_k=SEARCH_TOP_K_USER)
             
             # 결과 변환 및 필터링
             output = []
             for result in results:
                 # 유사도 임계값 확인 (FR-004)
                 # 이미 search_similar에서 필터링되지만 명시적으로 재확인
-                if result.get('similarity', 0) >= 0.7:
+                if result.get('similarity', 0) >= SIMILARITY_THRESHOLD:
                     # 사용자에게 표시할 정보만 추출 (FR-003: 정확한 정보만)
                     output.append({
                         'answer': result.get('answer', '답변을 찾을 수 없습니다'),

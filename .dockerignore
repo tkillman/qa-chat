@@ -49,4 +49,11 @@ docs/
 
 # Project specific
 *.log
+*.log*
 *.db~
+
+# Tool-specific required patterns
+node_modules/
+Dockerfile*
+.dockerignore
+coverage/

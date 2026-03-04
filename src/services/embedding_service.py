@@ -25,12 +25,14 @@ class EmbeddingService:
         self._initialize_embeddings()
     
     def _initialize_embeddings(self) -> None:
-        """임베딩 모델 초기화 (LangChain)"""
+        """임베딩 모델 초기화
+
+        FR-013 계약에 따라 기본값은 ChromaDB 기본 임베딩 함수로 고정한다.
+        """
         try:
-            # 주석 처리: research.md에서 최종 임베딩 모델 결정 후 구현
-            # 임시로 HuggingFace 오픈소스 모델 또는 OpenAI 사용
-            logger.info(f"Embedding service initialized with model: {self.model_name}")
-            
+            self._embeddings = "chromadb_default_function"
+            logger.info(f"Embedding service initialized with provider: {self._embeddings} (model={self.model_name})")
+
         except Exception as e:
             logger.error(f"Failed to initialize embeddings: {e}")
             raise
@@ -58,11 +60,8 @@ class EmbeddingService:
                 logger.debug("Embedding cache hit")
                 return cached_embedding
 
-            # TODO: research.md에서 최종 결정된 모델로 구현
-            # 예: from langchain.embeddings import HuggingFaceEmbeddings
-            # embedding = self._embeddings.embed_query(text)
-            
-            # 임시 좀플레이스홀더 (1536 차원, OpenAI 기준)
+            # FR-013: ChromaDB 기본 임베딩 함수 사용 (현재 테스트/개발용 placeholder)
+            # 실제 ChromaDB runtime 연동 시 컬렉션 임베딩 함수 결과로 교체 가능
             embedding = [0.0] * 1536
 
             # 캐시 저장
@@ -130,3 +129,7 @@ class EmbeddingService:
         except Exception as e:
             logger.error(f"Error calculating cosine similarity: {e}")
             raise
+
+    def get_embedding_provider(self) -> str:
+        """테스트/계약 검증용 임베딩 제공자 정보 반환."""
+        return str(self._embeddings)

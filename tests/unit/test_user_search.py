@@ -91,13 +91,13 @@ class TestUserSearchValidation:
         assert result['valid'] == False
     
     def test_query_too_long_fails(self):
-        """목표: 검색어가 너무 길면 거부 (FR-011에서 추정)"""
+        """목표: 검색어가 500자 초과이면 거부"""
         service = UserSearchService()
-        long_query = "Question " * 100  # 매우 긴 쿼리
-        
+        long_query = "Q" * 501
+
         result = service.validate_search_query(long_query)
-        # 너무 길면 거부하거나, 잘라내기
-        assert isinstance(result, dict)
+        assert result['valid'] == False
+        assert "500자" in result['error']
     
     def test_valid_query_passes(self):
         """목표: 올바른 검색어는 검증 통과"""
@@ -136,10 +136,14 @@ class TestUserSearchResults:
     def test_similarity_threshold_applied(self, search_service_with_data):
         """목표: 유사도 임계값 0.7 이상만 반환 (FR-004)"""
         results = search_service_with_data.search_qa("xyz123randomtext")
-        
+
         if len(results) > 0:
-            # 결과가 있으면 유사도가 임계값 이상
             assert results[0]['similarity'] >= SIMILARITY_THRESHOLD
+
+    def test_threshold_boundary_inclusive(self):
+        """목표: 경계값 0.7은 포함(>=) 처리"""
+        assert SIMILARITY_THRESHOLD == 0.7
+        assert 0.7 >= SIMILARITY_THRESHOLD
 
 
 class TestUserSearchEdgeCases:

@@ -179,9 +179,6 @@ def render_qa_cards(items: List[QAListItem], visible: bool = True) -> Tuple[str,
                                    text-transform: uppercase; letter-spacing: 0.5px;">
                         ✅ 답변
                     </strong>
-                    <span style="color: #999; font-size: 12px; margin-left: 8px;">
-                        {item.created_at[:10]}
-                    </span>
                 </div>
                 <div style="max-height: 180px; overflow-y: auto; margin-top: 8px;
                             padding: 10px; background: white; border-radius: 4px;
@@ -385,6 +382,11 @@ def create_admin_list_tab():
         items_per_page.value = 50
         current_page.value = 1
         
+        # 탭 활성 시 새로고침
+        def on_tab_select():
+            """탭 활성화 시 목록 새로고침"""
+            return load_list(1, 50)
+        
         # 이벤트 핸들러 등록
         # refresh_btn.click (50개 고정)
         def refresh_fixed():
@@ -444,4 +446,4 @@ def create_admin_list_tab():
             ],
         )
         
-        return qa_list_html, page_info, total_items_md, current_page
+        return qa_list_html, page_info, total_items_md, current_page, on_tab_select

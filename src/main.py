@@ -15,6 +15,7 @@ from src.services.auth_service import AuthService
 from src.services.qa_update_service import get_qa_update_service
 from src.services.user_search_service import get_user_search_service
 from src.services.langfuse_service import get_langfuse_service
+from src.ui.admin_list_tab import create_admin_list_tab
 from src.config import LOG_LEVEL, MAX_USER_QUESTION_LENGTH, MAX_ADMIN_QUESTION_LENGTH, MAX_ADMIN_ANSWER_LENGTH
 
 # 로깅 설정
@@ -67,7 +68,7 @@ class QAChatApp:
         Returns:
             gr.Blocks 인터페이스
         """
-        with gr.Blocks(title="QA Chat", theme=gr.themes.Soft()) as interface:
+        with gr.Blocks(title="QA Chat") as interface:
             gr.Markdown("# 📚 QA Chat")
             gr.Markdown("질문에 대한 답변을 제공하는 AI 챗봇")
             
@@ -111,46 +112,46 @@ class QAChatApp:
                 logout_btn = gr.Button("로그아웃", variant="secondary")
                 login_status = gr.Markdown("", visible=False)
                 
-                # 관리자 패널 (로그인 후 표시, US2에서 구현)
-                admin_header = gr.Markdown("## Q&A 관리", visible=False)
+                # 관리자 패널 (로그인 후 표시)
+                with gr.Group(visible=False) as admin_panel:
+                    with gr.Tabs():
+                        # Tab 1: Q&A 관리
+                        with gr.Tab("✏️ Q&A 관리"):
+                            gr.Markdown("### Q&A 항목 추가/수정")
+                            
+                            question_input = gr.Textbox(
+                                label="질문",
+                                placeholder="새로운 질문을 입력하세요",
+                                lines=2,
+                            )
+                            answer_input = gr.Textbox(
+                                label="답변",
+                                placeholder="답변을 입력하세요",
+                                lines=3,
+                            )
+                            add_btn = gr.Button("추가/수정", variant="primary")
+                            add_status = gr.Textbox(
+                                label="상태",
+                                interactive=False,
+                            )
 
-                question_input = gr.Textbox(
-                    label="질문",
-                    placeholder="새로운 질문을 입력하세요",
-                    lines=2,
-                    visible=False,
-                )
-                answer_input = gr.Textbox(
-                    label="답변",
-                    placeholder="답변을 입력하세요",
-                    lines=3,
-                    visible=False,
-                )
-                add_btn = gr.Button("추가/수정", variant="primary", visible=False)
-                add_status = gr.Textbox(
-                    label="상태",
-                    interactive=False,
-                    visible=False,
-                )
-
-                # 추가/수정 버튼 클릭 시 동작 (US3에서 구현)
-                add_btn.click(
-                    fn=self.update_qa,
-                    inputs=[question_input, answer_input],
-                    outputs=[add_status]
-                )
+                            # 추가/수정 버튼 클릭 시 동작
+                            add_btn.click(
+                                fn=self.update_qa,
+                                inputs=[question_input, answer_input],
+                                outputs=[add_status]
+                            )
+                        
+                        # Tab 2: 목록 조회 (새로 추가)
+                        create_admin_list_tab()
                 
-                # 로그인 버튼 클릭 시 동작 (US2에서 구현)
+                # 로그인 버튼 클릭 시 동작
                 login_btn.click(
                     fn=self.admin_login,
                     inputs=[password_input],
                     outputs=[
                         login_status,
-                        admin_header,
-                        question_input,
-                        answer_input,
-                        add_btn,
-                        add_status,
+                        admin_panel,
                     ]
                 )
 
@@ -159,11 +160,7 @@ class QAChatApp:
                     inputs=[],
                     outputs=[
                         login_status,
-                        admin_header,
-                        question_input,
-                        answer_input,
-                        add_btn,
-                        add_status,
+                        admin_panel,
                     ]
                 )
         
@@ -234,21 +231,15 @@ class QAChatApp:
             password: 입력한 패스워드
             
         Returns:
-            로그인 상태 및 관리자 컴포넌트 표시 업데이트 값
+            (로그인 상태 메시지, 관리자 패널 visible 상태)
         """
-        hidden = gr.update(visible=False)
-
         if not password:
             # 빈 패스워드
             msg = "패스워드를 입력해주세요"
             self.langfuse.log_admin_login(success=False, reason="empty_password")
             return (
                 gr.update(value=msg, visible=True),
-                hidden,
-                hidden,
-                hidden,
-                hidden,
-                hidden,
+                gr.update(visible=False),
             )
         
         # 패스워드 검증
@@ -260,14 +251,9 @@ class QAChatApp:
             msg = "✓ 로그인 성공하였습니다"
             self.langfuse.log_admin_login(success=True)
             logger.info("Admin login successful")
-            visible = gr.update(visible=True)
             return (
                 gr.update(value=msg, visible=True),
-                visible,
-                visible,
-                visible,
-                visible,
-                visible,
+                gr.update(visible=True),
             )
         else:
             # 로그인 실패
@@ -277,11 +263,7 @@ class QAChatApp:
             logger.warning("Admin login failed")
             return (
                 gr.update(value=msg, visible=True),
-                hidden,
-                hidden,
-                hidden,
-                hidden,
-                hidden,
+                gr.update(visible=False),
             )
 
     def admin_logout(self) -> tuple:
@@ -290,14 +272,9 @@ class QAChatApp:
         self.langfuse.log_admin_logout(success=True)
         logger.info("Admin logout successful")
 
-        hidden = gr.update(visible=False)
         return (
             gr.update(value="로그아웃되었습니다", visible=True),
-            hidden,
-            hidden,
-            hidden,
-            hidden,
-            hidden,
+            gr.update(visible=False),
         )
     
     def update_qa(self, question: str, answer: str) -> str:
@@ -353,7 +330,7 @@ class QAChatApp:
         
         # 앱 선입 이벤트 등록 (on_startup은 Gradio 3.50+ 문법)
         logger.info("Launching Gradio interface...")
-        self.interface.launch(share=share)
+        self.interface.launch(share=share, theme=gr.themes.Soft())
 
 
 async def create_app():

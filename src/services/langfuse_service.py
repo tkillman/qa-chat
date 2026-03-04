@@ -34,14 +34,22 @@ class LangfuseService:
     def _initialize_client(self) -> None:
         """Langfuse 클라이언트 초기화"""
         try:
-            # TODO: research.md에서 최종 결정 후 구현
-            # from langfuse import Langfuse
-            # self.client = Langfuse(api_key=self.api_key, host=self.host)
+            from langfuse import Langfuse
+            self.client = Langfuse(api_key=self.api_key, host=self.host)
             
             logger.info(f"Langfuse service initialized (host: {self.host})")
             
         except Exception as e:
             logger.warning(f"Failed to initialize Langfuse: {e}")
+            self.client = None
+    
+    def get_client(self):
+        """Langfuse 클라이언트 반환
+        
+        Returns:
+            Langfuse 클라이언트 (미초기화된 경우 None)
+        """
+        return self.client
     
     def log_event(self, name: str, metadata: Optional[Dict[str, Any]] = None) -> None:
         """이벤트 로깅 (헌법 관찰성 구현)

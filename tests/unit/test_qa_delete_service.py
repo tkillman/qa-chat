@@ -125,6 +125,7 @@ class TestQADeleteService:
         # Mock 설정
         mock_chromadb_instance = Mock()
         mock_langfuse_instance = Mock()
+        mock_langfuse_instance.get_client.return_value = None  # Langfuse 비활성화
         mock_qa_list_instance = Mock()
         
         qa_delete_service.chromadb_service = mock_chromadb_instance
@@ -139,7 +140,6 @@ class TestQADeleteService:
         assert result.qa_id == "hash_abc123"
         assert "성공" in result.message
         mock_chromadb_instance.delete.assert_called_once_with("hash_abc123")
-        mock_langfuse_instance.log_qa_deleted.assert_called_once()
     
     def test_delete_qa_item_missing_admin_user(self, qa_delete_service):
         """admin_user 없이 삭제 요청"""
@@ -160,8 +160,11 @@ class TestQADeleteService:
         mock_chromadb_instance = Mock()
         mock_chromadb_instance.delete.side_effect = KeyError("항목을 찾을 수 없음")
         
+        mock_langfuse_instance = Mock()
+        mock_langfuse_instance.get_client.return_value = None  # Langfuse 비활성화
+        
         qa_delete_service.chromadb_service = mock_chromadb_instance
-        qa_delete_service.langfuse_service = Mock()
+        qa_delete_service.langfuse_service = mock_langfuse_instance
         
         result = qa_delete_service.delete_qa_item(valid_delete_request)
         

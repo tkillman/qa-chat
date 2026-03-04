@@ -33,7 +33,9 @@ def test_delete_response_is_under_2_seconds():
     service = QADeleteService()
 
     service.chromadb_service = Mock()
-    service.langfuse_service = Mock()
+    mock_langfuse = Mock()
+    mock_langfuse.get_client.return_value = None
+    service.langfuse_service = mock_langfuse
     service.qa_list_service = Mock()
 
     request = QADeleteRequest(qa_id="hash_perf", admin_user="admin")

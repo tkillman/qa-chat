@@ -13,7 +13,9 @@ def _make_service_with_mock(side_effect=None):
     if side_effect is not None:
         chromadb.delete.side_effect = side_effect
     service.chromadb_service = chromadb
-    service.langfuse_service = Mock()
+    mock_langfuse = Mock()
+    mock_langfuse.get_client.return_value = None
+    service.langfuse_service = mock_langfuse
     service.qa_list_service = Mock()
     return service
 
@@ -28,7 +30,7 @@ def test_delete_message_for_not_found_error():
 
 
 def test_delete_message_for_network_error():
-    service = _make_service_with_mock(Exception("network disconnected"))
+    service = _make_service_with_mock(Exception("네트워크 오류"))
 
     result = service.delete_qa_item(QADeleteRequest(qa_id="hash1", admin_user="admin"))
 

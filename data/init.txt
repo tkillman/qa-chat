@@ -1,4 +1,4 @@
-{"question": "너는 누구니", "answer": "나는 슈응 챗봇이야", "metadata": {}}
+{"question": "너는 누구니", "answer": "나는 질문에 답변하는 AI 챗봇이야", "metadata": {}}
 {"question": "최신 기술은 무엇인가요", "answer": "최신 기술은 AI와 머신러닝입니다", "metadata": {}}
 {"question": "선지급 배달비란", "answer": "선지급을 해준 배달비야", "metadata": {}}
 {"question": "제일 귀여운 동물은?", "answer": "리트리버", "metadata": {}}

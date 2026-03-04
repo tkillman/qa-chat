@@ -89,10 +89,29 @@ class QADeleteService:
         
         except Exception as e:
             logger.error(f"Q&A 항목 삭제 실패: {request.qa_id}, 오류: {str(e)}")
+
+            error_reason = str(e)
+            if "찾을 수 없습니다" in error_reason:
+                user_message = "Q&A 항목을 찾을 수 없습니다"
+            elif "network" in error_reason.lower() or "네트워크" in error_reason:
+                user_message = "네트워크 오류가 발생했습니다"
+            else:
+                user_message = "Q&A 항목 삭제 중 오류가 발생했습니다"
             
             return QADeleteResult(
                 success=False,
                 qa_id=request.qa_id,
-                message="Q&A 항목 삭제 중 오류가 발생했습니다",
+                message=user_message,
                 error_reason=str(e)
             )
+
+
+_qa_delete_service_instance: Optional[QADeleteService] = None
+
+
+def get_qa_delete_service() -> QADeleteService:
+    """QADeleteService 싱글톤 팩토리"""
+    global _qa_delete_service_instance
+    if _qa_delete_service_instance is None:
+        _qa_delete_service_instance = QADeleteService()
+    return _qa_delete_service_instance

@@ -47,10 +47,11 @@ class QADeleteRequest:
         if not self.admin_user or not self.admin_user.strip():
             raise ValueError("admin_user는 비워둘 수 없습니다")
         
-        # Rule 3: qa_id 형식 (영문/숫자/하이픈/밑줄 - Hash ID 형식)
-        import re
-        if not re.match(r'^[a-zA-Z0-9_-]+$', self.qa_id):
-            raise ValueError("qa_id 형식이 올바르지 않습니다")
+        # Rule 3: qa_id는 질문 문자열 기반 ID도 허용
+        # (현재 시스템의 get_hash_key()가 정규화된 질문 문자열을 반환하므로
+        #  공백/특수문자를 포함할 수 있어 과도한 정규식 제한을 두지 않음)
+        if len(self.qa_id.strip()) > 500:
+            raise ValueError("qa_id 길이가 너무 깁니다")
         
         # Rule 4: admin_user 길이 제한
         if len(self.admin_user) > 50:

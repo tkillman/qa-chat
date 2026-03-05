@@ -5,6 +5,7 @@ Gradio를 사용하여 관리자가 등록된 Q&A 항목을 페이징하여 조�
 
 import gradio as gr
 import logging
+import json
 from typing import List, Tuple, Optional, Dict, Any
 from dataclasses import dataclass, field, asdict
 
@@ -84,6 +85,16 @@ def _default_deletion_state() -> Dict[str, Any]:
     return DeletionState().to_dict()
 
 
+def _normalize_deletion_state(state: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """삭제 상태를 안전한 딕셔너리로 정규화"""
+    if not state:
+        return _default_deletion_state()
+    return {
+        **_default_deletion_state(),
+        **state,
+    }
+
+
 def _build_delete_choices(items: List[QAListItem]) -> List[Tuple[str, str]]:
     choices: List[Tuple[str, str]] = []
     for item in items:
@@ -119,6 +130,23 @@ def render_qa_cards(items: List[QAListItem], visible: bool = True) -> Tuple[str,
     '''
     
     for item in items:
+        qa_id_js = json.dumps(item.id)
+        onclick_js = (
+            "try{"
+            f"const qaId={qa_id_js};"
+            "let hiddenInput=null;"
+            "const exact=document.getElementById('hidden-qa-id');"
+            "if(exact){hiddenInput=(exact.tagName==='TEXTAREA'||exact.tagName==='INPUT')?exact:exact.querySelector('textarea,input[type=text],input:not([type])');}"
+            "if(!hiddenInput){const cands=document.querySelectorAll('[id*=hidden-qa-id]');for(const el of cands){const input=(el.tagName==='TEXTAREA'||(el.tagName==='INPUT'&&(el.type==='text'||!el.type)))?el:el.querySelector('textarea,input[type=text],input:not([type])');if(input){hiddenInput=input;break;}}}"
+            "if(hiddenInput){hiddenInput.value=qaId;hiddenInput.dispatchEvent(new Event('input',{bubbles:true}));hiddenInput.dispatchEvent(new Event('change',{bubbles:true}));}"
+            "let triggerBtn=null;"
+            "const t=document.getElementById('hidden-instant-delete-trigger');"
+            "if(t){triggerBtn=t.tagName==='BUTTON'?t:t.querySelector('button');}"
+            "if(!triggerBtn){const tc=document.querySelectorAll('[id*=hidden-instant-delete-trigger]');for(const el of tc){const btn=el.tagName==='BUTTON'?el:el.querySelector('button');if(btn){triggerBtn=btn;break;}}}"
+            "if(triggerBtn){setTimeout(()=>triggerBtn.click(),50);}else{console.error('Trigger button not found');}"
+            "}catch(e){console.error('delete bridge error',e);}"
+        )
+
         # HTML 이스케이프 처리
         question_html = item.question.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
         answer_html = item.answer.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
@@ -141,7 +169,7 @@ def render_qa_cards(items: List[QAListItem], visible: bool = True) -> Tuple[str,
                         </span>
                     </div>
                     <button type="button" 
-                            onclick="deleteQA('{item.id}')"
+                            onclick="{onclick_js}"
                             title="삭제"
                             style="border: 1px solid #fecaca; background: #fff1f2; color: #be123c;
                                    border-radius: 6px; padding: 6px 10px; font-size: 12px;
@@ -207,96 +235,20 @@ def create_admin_list_tab():
     delete_service = get_qa_delete_service()
     
     with gr.Tab("📋 목록 조회"):
-        # 글로벌 deleteQA 함수 정의 (한 번만 로드)
+        # 숨겨진 브리지용 스타일 정의
         gr.HTML('''
-        <script>
-        (function() {
-            // 전역 deleteQA 함수 정의
-            window.deleteQA = function(qaId) {
-                try {
-                    console.log('deleteQA called with:', qaId);
-                    
-                    // 전체 문서에서 숨겨진 입력 필드 찾기
-                    let hiddenInput = null;
-                    
-                    // 방법 1: ID로 직접 검색
-                    hiddenInput = document.querySelector('#hidden-qa-id textarea') || 
-                                 document.querySelector('#hidden-qa-id input');
-                    
-                    // 방법 2: 부분 매칭
-                    if (!hiddenInput) {
-                        const candidates = document.querySelectorAll('[id*="hidden-qa-id"]');
-                        for (let elem of candidates) {
-                            let input = elem.querySelector('textarea') || elem.querySelector('input');
-                            if (input) {
-                                hiddenInput = input;
-                                break;
-                            }
-                        }
-                    }
-                    
-                    // 방법 3: 전체 검색
-                    if (!hiddenInput) {
-                        const allTextareas = document.querySelectorAll('textarea');
-                        const allInputs = document.querySelectorAll('input[type="text"]');
-                        for (let elem of allTextareas) {
-                            if (elem.id && elem.id.includes('hidden-qa-id')) {
-                                hiddenInput = elem;
-                                break;
-                            }
-                        }
-                        if (!hiddenInput) {
-                            for (let elem of allInputs) {
-                                if (elem.id && elem.id.includes('hidden-qa-id')) {
-                                    hiddenInput = elem;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    
-                    if (hiddenInput) {
-                        console.log('Found hidden input:', hiddenInput);
-                        hiddenInput.value = qaId;
-                        
-                        // 이벤트 트리거
-                        hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
-                        hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
-                        
-                        console.log('Value set to:', hiddenInput.value);
-                        
-                        // 트리거 버튼 클릭
-                        setTimeout(() => {
-                            let triggerBtn = document.querySelector('#hidden-delete-trigger button');
-                            
-                            if (!triggerBtn) {
-                                const candidates = document.querySelectorAll('[id*="hidden-delete-trigger"]');
-                                for (let elem of candidates) {
-                                    let btn = elem.querySelector('button');
-                                    if (btn) {
-                                        triggerBtn = btn;
-                                        break;
-                                    }
-                                }
-                            }
-                            
-                            if (triggerBtn) {
-                                console.log('Clicking trigger button');
-                                triggerBtn.click();
-                            } else {
-                                console.error('Trigger button not found');
-                            }
-                        }, 250);
-                    } else {
-                        console.error('Failed to find hidden input element');
-                    }
-                } catch (e) {
-                    console.error('Error in deleteQA:', e);
-                }
-            };
-            console.log('deleteQA function registered globally');
-        })();
-        </script>
+        <style>
+        .delete-hidden-bridge {
+            position: absolute !important;
+            left: -9999px !important;
+            top: 0 !important;
+            width: 1px !important;
+            height: 1px !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+            overflow: hidden !important;
+        }
+        </style>
         ''')
         
         with gr.Column(elem_classes="tab-content-padding"):
@@ -308,9 +260,21 @@ def create_admin_list_tab():
             items_per_page = gr.State(10)
             deletion_state = gr.State(_default_deletion_state())
             
-            # 숨겨진 컴포넌트 (JavaScript에서 사용)
-            hidden_qa_id = gr.Textbox(visible=False, elem_id="hidden-qa-id")
-            hidden_delete_trigger = gr.Button(visible=False, elem_id="hidden-delete-trigger")
+            # 숨겨진 브리지 컴포넌트 (JavaScript에서 사용)
+            # visible=False 대신 CSS 숨김을 사용해 DOM에서 항상 조회 가능하도록 유지
+            hidden_qa_id = gr.Textbox(
+                visible=True,
+                elem_id="hidden-qa-id",
+                elem_classes=["delete-hidden-bridge"],
+                container=False,
+                label=""
+            )
+            hidden_instant_delete_trigger = gr.Button(
+                value="instant-delete-trigger",
+                visible=True,
+                elem_id="hidden-instant-delete-trigger",
+                elem_classes=["delete-hidden-bridge"],
+            )
             
             # 새로고침 버튼 (우측 정렬)
             with gr.Row(elem_classes="control-row-right"):
@@ -380,6 +344,7 @@ def create_admin_list_tab():
         
         def open_delete_dialog(qa_id: str, state: Dict[str, Any]):
             """삭제 확인 다이얼로그 열기 (카드 버튼에서 호출)"""
+            state = _normalize_deletion_state(state)
             if not qa_id or not qa_id.strip():
                 gr.Error("삭제할 항목을 선택해주세요")
                 return gr.update(visible=False), gr.update(value=""), state
@@ -454,6 +419,29 @@ def create_admin_list_tab():
                 gr.update(value=f"선택된 항목 ID: `{selected_qa_id}`"),
                 failed_state,
             )
+
+        def instant_delete(qa_id: str, page: int):
+            """확인 다이얼로그 없이 즉시 삭제 실행"""
+            if not qa_id or not qa_id.strip():
+                gr.Error("삭제할 항목을 찾을 수 없습니다")
+                html, page_text, total_text, current = load_list(page, 50)
+                return html, page_text, total_text, current, _default_deletion_state()
+
+            request = QADeleteRequest(qa_id=qa_id, admin_user="admin")
+            result = delete_service.delete_qa_item(request)
+
+            if result.success:
+                gr.Info("✓ 삭제되었습니다")
+                refreshed_view = service.list_items(page=page, items_per_page=50)
+                target_page = page
+                if page > 1 and len(refreshed_view.items) == 0:
+                    target_page = 1
+                html, page_text, total_text, current = load_list(target_page, 50)
+                return html, page_text, total_text, current, _default_deletion_state()
+
+            gr.Error(f"❌ 삭제 실패했습니다 - {result.message}")
+            html, page_text, total_text, current = load_list(page, 50)
+            return html, page_text, total_text, current, _default_deletion_state()
         
         # 상태 초기값 설정
         items_per_page.value = 50
@@ -496,11 +484,11 @@ def create_admin_list_tab():
             outputs=[qa_list_html, page_info, total_items_md, current_page]
         )
 
-        # 숨겨진 트리거 버튼이 클릭되면 다이얼로그 열기
-        hidden_delete_trigger.click(
-            fn=open_delete_dialog,
-            inputs=[hidden_qa_id, deletion_state],
-            outputs=[delete_confirm_dialog, selected_qa_md, deletion_state],
+        # 숨겨진 즉시 삭제 트리거 버튼 클릭 시 바로 삭제 실행
+        hidden_instant_delete_trigger.click(
+            fn=instant_delete,
+            inputs=[hidden_qa_id, current_page],
+            outputs=[qa_list_html, page_info, total_items_md, current_page, deletion_state],
         )
 
         delete_confirm_no.click(

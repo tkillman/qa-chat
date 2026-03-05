@@ -70,30 +70,104 @@ class QAChatApp:
         """
         # CSS는 launch()에서 전달할 예정
         with gr.Blocks(title="QA Chat") as interface:
-            gr.Markdown("# 📚 QA Chat")
+            # 카카오톡 스타일 CSS
+            gr.HTML("""
+            <style>
+            .chat-container {
+                background: #abc1d1;
+                border-radius: 8px;
+                padding: 20px;
+                height: 600px;
+                overflow-y: auto;
+                margin-bottom: 20px;
+            }
+            .message-row {
+                margin-bottom: 12px;
+                display: flex;
+                align-items: flex-end;
+            }
+            .message-row.user {
+                justify-content: flex-end;
+            }
+            .message-row.bot {
+                justify-content: flex-start;
+            }
+            .message-bubble {
+                max-width: 60%;
+                padding: 10px 14px;
+                border-radius: 18px;
+                word-wrap: break-word;
+                font-size: 14px;
+                line-height: 1.5;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            }
+            .message-bubble.user {
+                background: #fee500;
+                color: #000;
+                border-bottom-right-radius: 4px;
+            }
+            .message-bubble.bot {
+                background: #fff;
+                color: #000;
+                border-bottom-left-radius: 4px;
+            }
+            .message-time {
+                font-size: 11px;
+                color: #666;
+                margin: 0 8px;
+            }
+            .empty-chat {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100%;
+                color: #fff;
+                opacity: 0.7;
+            }
+            .empty-chat-icon {
+                font-size: 80px;
+                margin-bottom: 20px;
+            }
+            </style>
+            """)
+            
+            gr.Markdown("# 💬 QA Chat")
             gr.Markdown("질문에 대한 답변을 제공하는 AI 챗봇")
             
             with gr.Tab("사용자"):
-                gr.Markdown("## 질문하기")
-                gr.Markdown("저장된 Q&A 중에서 유사한 답변을 찾아드립니다.")
+                # 채팅 히스토리 상태 관리
+                chat_history = gr.State([])
                 
-                user_question = gr.Textbox(
-                    label="질문",
-                    placeholder="질문을 입력하세요...",
-                    lines=2,
-                )
-                search_btn = gr.Button("답변 찾기", variant="primary")
-                answer_output = gr.Textbox(
-                    label="답변",
-                    interactive=False,
-                    lines=3,
+                # 채팅 화면
+                chat_display = gr.HTML(
+                    value=self._render_empty_chat(),
+                    elem_classes="chat-container"
                 )
                 
-                # 검색 버튼 클릭 시 동작 (스트리밍 반응, 한글자씩)
+                # 입력 영역
+                with gr.Row():
+                    user_question = gr.Textbox(
+                        label="",
+                        placeholder="메시지를 입력하세요...",
+                        lines=1,
+                        scale=9,
+                        container=False,
+                    )
+                    search_btn = gr.Button("전송", variant="primary", scale=1)
+                
+                # 검색 버튼 클릭 시 동작
                 search_btn.click(
-                    fn=self.search_answer,
-                    inputs=[user_question],
-                    outputs=[answer_output]
+                    fn=self.chat_interaction,
+                    inputs=[user_question, chat_history],
+                    outputs=[chat_display, chat_history, user_question]
+                )
+                
+                # 엔터키로 전송
+                user_question.submit(
+                    fn=self.chat_interaction,
+                    inputs=[user_question, chat_history],
+                    outputs=[chat_display, chat_history, user_question]
                 )
             
             with gr.Tab("관리자"):
@@ -171,6 +245,124 @@ class QAChatApp:
                 )
         
         return interface
+    
+    def _render_empty_chat(self) -> str:
+        """빈 채팅 화면 렌더링"""
+        return """
+        <div class="chat-container">
+            <div class="empty-chat">
+                <div class="empty-chat-icon">💬</div>
+                <div>질문을 입력하여 대화를 시작하세요</div>
+            </div>
+        </div>
+        """
+    
+    def _render_chat_history(self, history: list) -> str:
+        """채팅 히스토리를 카카오톡 스타일로 렌더링
+        
+        Args:
+            history: [{"role": "user"|"bot", "message": str, "time": str}, ...]
+            
+        Returns:
+            HTML 문자열
+        """
+        if not history:
+            return self._render_empty_chat()
+        
+        messages_html = ""
+        for msg in history:
+            role = msg.get("role", "bot")
+            message = msg.get("message", "")
+            time = msg.get("time", "")
+            
+            # HTML 이스케이프
+            message_escaped = (message
+                .replace('&', '&amp;')
+                .replace('<', '&lt;')
+                .replace('>', '&gt;')
+                .replace('\n', '<br>'))
+            
+            if role == "user":
+                messages_html += f"""
+                <div class="message-row user">
+                    <span class="message-time">{time}</span>
+                    <div class="message-bubble user">{message_escaped}</div>
+                </div>
+                """
+            else:
+                messages_html += f"""
+                <div class="message-row bot">
+                    <div class="message-bubble bot">{message_escaped}</div>
+                    <span class="message-time">{time}</span>
+                </div>
+                """
+        
+        return f"""
+        <div class="chat-container">
+            {messages_html}
+        </div>
+        """
+    
+    def chat_interaction(self, question: str, history: list):
+        """카카오톡 스타일 채팅 인터랙션
+        
+        Args:
+            question: 사용자 질문
+            history: 채팅 히스토리
+            
+        Returns:
+            (채팅 화면 HTML, 업데이트된 히스토리, 빈 입력창)
+        """
+        from datetime import datetime
+        
+        # 빈 질문 처리
+        if not question or not question.strip():
+            return self._render_chat_history(history), history, ""
+        
+        # 현재 시간
+        current_time = datetime.now().strftime("%H:%M")
+        
+        # 사용자 메시지 추가
+        history.append({
+            "role": "user",
+            "message": question,
+            "time": current_time
+        })
+        
+        # 임시로 사용자 메시지만 표시
+        yield self._render_chat_history(history), history, ""
+        
+        try:
+            # 길이 제한 검증
+            if len(question) > MAX_USER_QUESTION_LENGTH:
+                answer = f"질문은 {MAX_USER_QUESTION_LENGTH}자 이내여야 합니다"
+            else:
+                # 답변 검색
+                results = self.user_search_service.search_qa(question)
+                
+                if results and len(results) > 0:
+                    answer = results[0].get('answer', '답변을 찾을 수 없습니다')
+                    logger.info(f"User search successful: '{question[:50]}...'")
+                else:
+                    answer = "죄송합니다. 관련된 답변을 찾을 수 없습니다. 😔"
+                    logger.info(f"No results for user question: '{question[:50]}...'")
+        
+        except Exception as e:
+            answer = "검색 중 오류가 발생했습니다."
+            logger.error(f"Error searching answer: {e}")
+            self.langfuse.log_error(
+                error_type="user_search_ui_failed",
+                error_message=str(e)
+            )
+        
+        # 봇 응답 추가
+        history.append({
+            "role": "bot",
+            "message": answer,
+            "time": current_time
+        })
+        
+        yield self._render_chat_history(history), history, ""
     
     def search_answer(self, question: str) -> tuple:
         """사용자 질문에 답변 검색 (US4)

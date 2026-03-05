@@ -45,6 +45,13 @@ class QAListService:
             ListViewState: 목록 뷰 상태 (항목, 페이징 정보, 오류 메시지)
         """
         try:
+            # Step 0: 컬렉션 상태 확인
+            try:
+                self.chromadb_service._ensure_collection_healthy()
+            except Exception as e:
+                logger.error(f"컬렉션 재생성 실패: {e}")
+                raise
+            
             # Step 1: ChromaDB에서 모든 항목 조회
             all_items = []
             try:

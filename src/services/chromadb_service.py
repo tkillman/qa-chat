@@ -57,9 +57,20 @@ class ChromaDBService:
                 for col in existing_collections:
                     if col.name == self.collection_name:
                         # 기존 컬렉션 재사용 시도
-                        self.collection = self.client.get_collection(name=self.collection_name)
-                        logger.info(f"Reusing existing collection '{self.collection_name}'")
-                        return
+                        try:
+                            self.collection = self.client.get_collection(name=self.collection_name)
+                            # 간단한 액세스 테스트 (손상 확인)
+                            self.collection.count()
+                            logger.info(f"Reusing existing collection '{self.collection_name}'")
+                            return
+                        except Exception as col_error:
+                            logger.warning(f"Existing collection is corrupted, will recreate: {col_error}")
+                            # 손상된 컬렉션 삭제 후 재생성
+                            try:
+                                self.client.delete_collection(name=self.collection_name)
+                            except:
+                                pass
+                            break
             except Exception as e:
                 logger.debug(f"Error checking existing collections: {e}")
             
@@ -72,6 +83,27 @@ class ChromaDBService:
             
         except Exception as e:
             logger.error(f"Error initializing collection: {e}")
+            raise
+    
+    def _ensure_collection_healthy(self) -> None:
+        """컬렉션 상태 확인 및 손상 시 재생성"""
+        try:
+            if self.collection is None:
+                self._initialize_collection()
+                return
+            
+            # 컬렉션 접근 가능성 테스트
+            try:
+                self.collection.count()
+            except Exception as e:
+                logger.warning(f"Collection is unhealthy, rebuilding: {e}")
+                try:
+                    self.client.delete_collection(name=self.collection_name)
+                except:
+                    pass
+                self._initialize_collection()
+        except Exception as e:
+            logger.error(f"Error ensuring collection health: {e}")
             raise
     
     def add_qa_items(self, items: List[QAItem]) -> None:

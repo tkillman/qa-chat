@@ -170,7 +170,7 @@ class ChromaDBService:
             results = self.collection.query(
                 query_texts=[query],
                 n_results=top_k,
-                include=["documents", "metadatas", "distances", "ids"]
+                include=["documents", "metadatas", "distances"]
             )
             
             # 결과 변환 및 임계값 필터링 (FR-004 참고: 유사도 0.7 이상)

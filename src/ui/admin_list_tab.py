@@ -6,6 +6,7 @@ Gradio를 사용하여 관리자가 등록된 Q&A 항목을 페이징하여 조�
 import gradio as gr
 import logging
 from typing import List, Tuple, Optional, Dict, Any
+from dataclasses import dataclass, field, asdict
 
 # 경로 설정
 import sys
@@ -20,13 +21,67 @@ from services.qa_delete_service import get_qa_delete_service
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class DeletionState:
+    """Q&A 항목 삭제 모달 대화 상태 (Phase 2: Foundational - T009)
+    
+    Gradio State 컴포넌트에서 추적되는 삭제 UI 상태 관리
+    
+    속성:
+        show_dialog: 확인 모달 표시 여부
+        selected_qa_id: 선택된 Q&A 항목 ID
+        selected_question_preview: 삭제될 항목의 질문 미리보기
+        is_deleting: 삭제 작업 진행 중 여부
+    
+    상태 변환 (data-model.md 상태 다이어그램):
+        초기화 → open_dialog() → 모달표시 → confirm_delete() → 삭제중
+                             ↓ cancel()
+                             초기화
+    """
+    show_dialog: bool = False
+    selected_qa_id: Optional[str] = None
+    selected_question_preview: Optional[str] = None
+    is_deleting: bool = False
+    
+    def open_dialog(self, qa_id: str, question_preview: str) -> None:
+        """삭제 확인 모달 열기
+        
+        Args:
+            qa_id: 삭제할 Q&A 항목 ID
+            question_preview: 삭제될 항목의 질문 (UI 표시용)
+        """
+        self.show_dialog = True
+        self.selected_qa_id = qa_id
+        self.selected_question_preview = question_preview
+        self.is_deleting = False
+    
+    def mark_deleting(self) -> None:
+        """삭제 작업 시작 표시 (UI 로딩 상태)"""
+        self.is_deleting = True
+    
+    def reset(self) -> None:
+        """상태 초기화 (모달 닫기)"""
+        self.show_dialog = False
+        self.selected_qa_id = None
+        self.selected_question_preview = None
+        self.is_deleting = False
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """상태를 딕셔너리로 변환 (Gradio State 호환)
+        
+        Returns:
+            상태 딕셔너리
+        """
+        return asdict(self)
+
+
 def _default_deletion_state() -> Dict[str, Any]:
-    return {
-        "show_dialog": False,
-        "selected_qa_id": None,
-        "selected_question_preview": None,
-        "is_deleting": False,
-    }
+    """기본 삭제 상태 생성 (레거시 호환성, DeletionState.to_dict() 래퍼)
+    
+    Returns:
+        기본 삭제 상태 딕셔너리
+    """
+    return DeletionState().to_dict()
 
 
 def _build_delete_choices(items: List[QAListItem]) -> List[Tuple[str, str]]:
@@ -60,76 +115,6 @@ def render_qa_cards(items: List[QAListItem], visible: bool = True) -> Tuple[str,
     
     # 카드 HTML 생성
     html = '''
-    <script>
-    // deleteQA 함수를 전역 스코프에 정의 (한 번만 정의)
-    if (!window.deleteQA) {
-        window.deleteQA = function(qaId) {
-            try {
-                console.log('deleteQA called with:', qaId);
-                
-                // 숨겨진 텍스트박스 찾기 (iframe 내부 처리)
-                let hiddenInput = document.querySelector('#hidden-qa-id textarea');
-                if (!hiddenInput) {
-                    hiddenInput = document.querySelector('#hidden-qa-id input');
-                }
-                if (!hiddenInput) {
-                    hiddenInput = document.querySelector('[id*="hidden-qa-id"] textarea');
-                }
-                
-                if (!hiddenInput) {
-                    console.error('Hidden input not found. Trying parent search...');
-                    const parent = document.querySelector('[id*="hidden-qa-id"]');
-                    if (parent) {
-                        hiddenInput = parent.querySelector('textarea') || parent.querySelector('input');
-                    }
-                }
-                
-                if (hiddenInput) {
-                    console.log('Found hidden input:', hiddenInput);
-                    hiddenInput.value = qaId;
-                    
-                    // 다양한 이벤트 디스패치
-                    hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
-                    
-                    // change 이벤트가 Gradio state 업데이트를 트리거하도록 함
-                    if (hiddenInput.dispatchEvent) {
-                        hiddenInput.dispatchEvent(new InputEvent('input', {
-                            bubbles: true,
-                            cancelable: true,
-                            data: qaId
-                        }));
-                    }
-                    
-                    console.log('Value set to:', hiddenInput.value);
-                    
-                    // 트리거 버튼 클릭
-                    setTimeout(() => {
-                        const triggerBtn = document.querySelector('#hidden-delete-trigger button');
-                        if (!triggerBtn) {
-                            console.log('Trying alternate trigger selector...');
-                            const trigger2 = document.querySelector('[id*="hidden-delete-trigger"] button');
-                            if (trigger2) {
-                                console.log('Found trigger via alternate selector, clicking');
-                                trigger2.click();
-                            } else {
-                                console.error('Trigger button not found');
-                            }
-                        } else {
-                            console.log('Clicking trigger button');
-                            triggerBtn.click();
-                        }
-                    }, 250);
-                } else {
-                    console.error('Failed to find hidden input element');
-                }
-            } catch (e) {
-                console.error('Error in deleteQA:', e);
-            }
-        };
-    }
-    </script>
-    
     <div style="display: flex; flex-direction: column; gap: 16px; max-height: 600px; overflow-y: auto; padding-right: 10px;">
     '''
     
@@ -222,6 +207,98 @@ def create_admin_list_tab():
     delete_service = get_qa_delete_service()
     
     with gr.Tab("📋 목록 조회"):
+        # 글로벌 deleteQA 함수 정의 (한 번만 로드)
+        gr.HTML('''
+        <script>
+        (function() {
+            // 전역 deleteQA 함수 정의
+            window.deleteQA = function(qaId) {
+                try {
+                    console.log('deleteQA called with:', qaId);
+                    
+                    // 전체 문서에서 숨겨진 입력 필드 찾기
+                    let hiddenInput = null;
+                    
+                    // 방법 1: ID로 직접 검색
+                    hiddenInput = document.querySelector('#hidden-qa-id textarea') || 
+                                 document.querySelector('#hidden-qa-id input');
+                    
+                    // 방법 2: 부분 매칭
+                    if (!hiddenInput) {
+                        const candidates = document.querySelectorAll('[id*="hidden-qa-id"]');
+                        for (let elem of candidates) {
+                            let input = elem.querySelector('textarea') || elem.querySelector('input');
+                            if (input) {
+                                hiddenInput = input;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // 방법 3: 전체 검색
+                    if (!hiddenInput) {
+                        const allTextareas = document.querySelectorAll('textarea');
+                        const allInputs = document.querySelectorAll('input[type="text"]');
+                        for (let elem of allTextareas) {
+                            if (elem.id && elem.id.includes('hidden-qa-id')) {
+                                hiddenInput = elem;
+                                break;
+                            }
+                        }
+                        if (!hiddenInput) {
+                            for (let elem of allInputs) {
+                                if (elem.id && elem.id.includes('hidden-qa-id')) {
+                                    hiddenInput = elem;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (hiddenInput) {
+                        console.log('Found hidden input:', hiddenInput);
+                        hiddenInput.value = qaId;
+                        
+                        // 이벤트 트리거
+                        hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        
+                        console.log('Value set to:', hiddenInput.value);
+                        
+                        // 트리거 버튼 클릭
+                        setTimeout(() => {
+                            let triggerBtn = document.querySelector('#hidden-delete-trigger button');
+                            
+                            if (!triggerBtn) {
+                                const candidates = document.querySelectorAll('[id*="hidden-delete-trigger"]');
+                                for (let elem of candidates) {
+                                    let btn = elem.querySelector('button');
+                                    if (btn) {
+                                        triggerBtn = btn;
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            if (triggerBtn) {
+                                console.log('Clicking trigger button');
+                                triggerBtn.click();
+                            } else {
+                                console.error('Trigger button not found');
+                            }
+                        }, 250);
+                    } else {
+                        console.error('Failed to find hidden input element');
+                    }
+                } catch (e) {
+                    console.error('Error in deleteQA:', e);
+                }
+            };
+            console.log('deleteQA function registered globally');
+        })();
+        </script>
+        ''')
+        
         with gr.Column(elem_classes="tab-content-padding"):
             gr.Markdown("### 등록된 질문답변 목록")
             gr.Markdown("최신 등록순으로 정렬되며, 페이징을 통해 조회할 수 있습니다.")

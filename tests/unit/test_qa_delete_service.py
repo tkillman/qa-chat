@@ -81,10 +81,10 @@ class TestQADeleteResult:
             success=False,
             qa_id="hash_abc123",
             message="삭제 실패",
-            error_reason="항목을 찾을 수 없음"
+            error_reason="not_found"
         )
         assert result.success is False
-        assert result.error_reason == "항목을 찾을 수 없음"
+        assert result.error_reason == "not_found"
     
     def test_empty_qa_id_raises_error(self):
         """빈 qa_id는 오류 발생"""
@@ -126,11 +126,9 @@ class TestQADeleteService:
         mock_chromadb_instance = Mock()
         mock_langfuse_instance = Mock()
         mock_langfuse_instance.get_client.return_value = None  # Langfuse 비활성화
-        mock_qa_list_instance = Mock()
         
         qa_delete_service.chromadb_service = mock_chromadb_instance
         qa_delete_service.langfuse_service = mock_langfuse_instance
-        qa_delete_service.qa_list_service = mock_qa_list_instance
         
         # 삭제 실행
         result = qa_delete_service.delete_qa_item(valid_delete_request)
@@ -138,7 +136,7 @@ class TestQADeleteService:
         # 검증
         assert result.success is True
         assert result.qa_id == "hash_abc123"
-        assert "성공" in result.message
+        assert "삭제" in result.message
         mock_chromadb_instance.delete.assert_called_once_with("hash_abc123")
     
     def test_delete_qa_item_missing_admin_user(self, qa_delete_service):
@@ -149,11 +147,13 @@ class TestQADeleteService:
         )
         
         qa_delete_service.chromadb_service = Mock()
+        qa_delete_service.langfuse_service = Mock()
+        qa_delete_service.langfuse_service.get_client.return_value = None
         
         result = qa_delete_service.delete_qa_item(request)
         
         assert result.success is False
-        assert "오류" in result.message
+        assert result.error_reason == "unknown_error"
     
     def test_delete_qa_item_not_found(self, qa_delete_service, valid_delete_request):
         """존재하지 않는 항목 삭제"""
@@ -169,4 +169,4 @@ class TestQADeleteService:
         result = qa_delete_service.delete_qa_item(valid_delete_request)
         
         assert result.success is False
-        assert "오류" in result.message
+        assert result.error_reason == "not_found"

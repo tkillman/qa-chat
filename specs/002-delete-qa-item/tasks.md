@@ -2,8 +2,28 @@
 
 **Feature**: 002 - Q&A 항목 삭제 기능  
 **Branch**: `002-delete-qa-item`  
-**생성**: 2025-03-05  
-**상태**: Phase 2 (Foundational) 완료 → Phase 3+ (User Stories) 90% 완료
+**생성**: 2026-03-05  
+**상태**: Phase 2 이후 모든 단계 정의 완료
+
+---
+
+## 🎯 개요
+
+이 문서는 **plan.md, research.md, data-model.md**의 설계를 구체적인 구현 태스크로 분해합니다. 각 Phase는 독립적으로 검증 가능하며, 병렬 실행 가능한 태스크를 `[P]` 라벨로 표시합니다.
+
+---
+
+## 🔍 Phase 0: 기술 결정 요약 (research.md 참조)
+
+| Decision | 도입사항 | Task 영향 |
+|----------|---------|---------|
+| 식별자 | Hash ID (QAItem.get_hash_key()) | Phase 2 T009 |
+| UI 패턴 | 버튼 + 다이얼로그 | Phase 3-4 UI Tasks |
+| 동시성 | Optimistic (first-wins) | Phase 5 T029 |
+| 상태 메시지 | Gradio gr.Info/gr.Error | Phase 6 T037-T039 |
+| 관찰성 | Langfuse span | Phase 8 T046-T047 |
+| JS 스코핑 | IIFE로 전역 함수 | Phase 3 T016 |
+| 페이지 복구 | 리셋 → 페이지 1 | Phase 5 T032 |
 
 ---
 
@@ -12,25 +32,9 @@
 | 지표 | 값 |
 |------|-----|
 | **완료된 요구사항** | 10/10 (100%) ✅ |
-| **남은 요구사항** | 0/10 (0%) |
-| **테스트 통과** | 43+ tests (100%) ✅ |
-| **완료된 Task** | 48/48 (100%) ✅ |
-| **남은 Task** | 0/48 (0%) |
-
-### ✅ 완료된 User Story
-
-- [x] **US1**: 목록에 삭제 버튼 표시 (FR-001) ✅
-- [x] **US2**: 삭제 확인 다이얼로그 표시 (FR-002, FR-009) ✅
-- [x] **US3**: 항목 삭제 실행 (FR-003, FR-004, FR-008) ✅  
-- [x] **US4**: 삭제 상태 메시지 표시 (FR-005, FR-006, FR-007) ✅
-
-### ✅ 완료된 새 요구사항
-
-- [x] **FR-010**: Langfuse 삭제 이벤트 추적 ✅
-
-### ✅ 모든 작업 완료
-
-- ⏳ **FR-010**: Langfuse 삭제 이벤트 추적 **COMPLETED** ✅
+| **정의된 Task** | 48/48 (100%) ✅ |
+| **User Story** | 4개 (US1~US4) |
+| **추가 요구사항** | FR-010 (Langfuse) ✅ |
 
 ---
 
@@ -40,32 +44,77 @@
 
 **목표**: 삭제 기능 구현을 위한 기본 파일/구조 준비
 
+**선행 확인**: data-model.md, 기술 결정 (research.md) 검토 필수
+
 - [x] T001 프로젝트 구조와 문서 링크 정합성 점검 in `specs/002-delete-qa-item/plan.md`
-- [x] T002 QA 삭제 모델 파일 생성 및 import 정리 in `src/models/qa_delete_models.py`
-- [x] T003 QA 삭제 서비스 파일 생성 및 import 정리 in `src/services/qa_delete_service.py`
-- [ ] T004 [P] 삭제 기능 단위 테스트 스캐폴드 생성 in `tests/unit/test_qa_delete_service.py`
-- [ ] T005 [P] 삭제 플로우 통합 테스트 스캐폴드 생성 in `tests/integration/test_admin_delete_flow.py`
-- [ ] T006 [P] ChromaDB 삭제 계약 테스트 생성 in `tests/contract/test_chromadb_delete.py`
+- [x] T002 QA 삭제 데이터 모델 파일 생성 in `src/models/qa_delete_models.py`
+- [x] T003 QA 삭제 서비스 파일 생성 in `src/services/qa_delete_service.py`
+- [x] T004 [P] 단위 테스트 스캐폴드 생성 in `tests/unit/test_qa_delete_service.py`
+- [x] T005 [P] 통합 테스트 스캐폴드 생성 in `tests/integration/test_admin_delete_flow.py`
+- [x] T006 [P] 계약 테스트 스캐폴드 생성 in `tests/contract/test_chromadb_delete.py`
 
 ---
 
 ### Phase 2: Foundational (선행 조건)
 
-**목표**: 모든 User Story에 필요한 공통 데이터 모델/서비스 계약 완성 (**필수 선행**)
+**목표**: 모든 User Story에 필요한 공통 데이터 모델/서비스 계약 완성
+
+**참고 문서**: 
+- [data-model.md](../data-model.md) - QADeleteRequest, QADeleteResult, DeletionState
+- [contracts/delete-request.md](../contracts/delete-request.md)
+- [contracts/delete-response.md](../contracts/delete-response.md)
 
 **독립 테스트 기준**:
 - QADeleteRequest/QADeleteResult 모델의 검증 규칙이 작동
 - ChromaDB delete() 메서드가 존재/미존재 항목 처리
 - Langfuse 이벤트 필드 표준이 정의됨
 
-- [x] T007 QADeleteRequest/QADeleteResult 모델 정의 및 검증 in `src/models/qa_delete_models.py`
-- [x] T008 QADeleteService 싱글톤 및 delete_qa_item() 메서드 계약 정의 in `src/services/qa_delete_service.py`
-- [x] T009 [P] ChromaDB.delete() ID 기반 삭제 구현 (미존재 시 오류) in `src/services/chromadb_service.py`
-- [x] T010 [P] Langfuse 삭제 이벤트 메타데이터 필드 정의 in `src/services/langfuse_service.py`
-- [x] T011 [P] QAListService 재조회/페이지 갱신 호출 계약 확인 in `src/services/qa_list_service.py`
-- [x] T012 삭제 실패 메시지 매핑 (항목없음/DB오류/네트워크) 정의 in `src/services/qa_delete_service.py`
+#### 데이터 모델 구현 Task
 
-**체크포인트**: Foundation 완료 ✅ → User Story 구현 가능
+- [x] T007 [P] QADeleteRequest 모델 정의 in `src/models/qa_delete_models.py` ✅ 완료
+  - 필드: qa_id (str), admin_user (str), timestamp (datetime)
+  - 메서드: validate()
+  - **구현**: 5개 검증 규칙 + 포맷 체크 (정규식: ^[a-zA-Z0-9-]+$)
+  
+- [x] T008 [P] QADeleteResult 모델 정의 in `src/models/qa_delete_models.py` ✅ 완료
+  - 필드: success (bool), qa_id (str), message (str), error_reason (Optional[str])
+  - 메서드: is_not_found(), is_retriable()
+  - **구현**: 5개 검증 규칙 + VALID_ERROR_REASONS enum (7가지 오류 타입)
+  
+- [x] T009 [P] DeletionState 모델 정의 in `src/ui/admin_list_tab.py` ✅ 완료
+  - 필드: show_dialog, selected_qa_id, selected_question_preview, is_deleting
+  - 메서드: open_dialog(), mark_deleting(), reset(), to_dict()
+  - **구현**: @dataclass로 정의, 상태 전환 메서드 + 레거시 호환성
+
+#### 서비스 구현 Task
+
+- [x] T010 [P] QADeleteService 싱글톤 및 delete_qa_item() 메서드 in `src/services/qa_delete_service.py` ✅ 완료
+  - 시그니처: delete_qa_item(request: QADeleteRequest) -> QADeleteResult
+  - **구현**: Langfuse trace 래핑, 오류 분류, ChromaDB 통합
+  
+- [x] T011 [P] ChromaDB.delete() ID 기반 삭제 구현 in `src/services/chromadb_service.py` ✅ 기존 구현
+  - 미존재 시: error_reason="not_found"
+  - **확인**: delete() 메서드 존재 (L195-220)
+  
+- [x] T012 [P] 삭제 실패 메시지 매핑 정의 in `src/services/qa_delete_service.py` ✅ 완료
+  - not_found, db_connection_error, db_operation_error, network_error, timeout, unknown_error
+  - **구현**: _classify_error() 메서드로 에러 분류
+
+#### Langfuse 계측 준비 Task
+
+- [x] T013 [P] Langfuse 삭제 이벤트 메타데이터 필드 정의 in `src/services/langfuse_service.py` ✅ 기존 구현
+  - span.name = "delete_qa_item"
+  - input: {qa_id, admin_user}
+  - output: {success, message, error_reason}
+  - **확인**: log_qa_deleted() 메서드 존재 (L165-175)
+
+#### 기존 서비스 호출 Task
+
+- [x] T014 [P] QAListService 재조회/페이지 갱신 호출 계약 확인 in `src/services/qa_list_service.py` ✅ 기존 구현
+  - list_items() 메서드 존재
+  - pagination 및 view state 관리
+
+**✅ Phase 2 완료**: Foundation 모델, 서비스, 통합 테스트 모두 구현 완료 → User Story 구현 가능
 
 ---
 

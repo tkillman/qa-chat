@@ -6,6 +6,130 @@
 
 ---
 
+## [1.1.0] - 2026-03-05 (관리자 Q&A 삭제 기능)
+
+### 추가됨
+
+#### 핵심 기능 (4개 사용자 스토리)
+
+- **US1 삭제 버튼 - 관리자 목록 조회 탭**
+  - 각 Q&A 항목 옆 🗑️ 삭제 버튼 추가
+  - 버튼 위치: 테이블 우측 액션 컬럼
+  - 삭제 권한: 관리자 로그인 필수
+  - HTML 이스케이핑: XSS 방지
+  
+- **US2 삭제 확인 다이얼로그**
+  - 실수 삭제 방지 2단계 확인
+  - 모달 레이아웃: 질문/답변 미리보기 + 확인/취소 버튼
+  - 응답성: < 1초 표시
+  - 스타일링: Gradio 4.x 네이티브 컴포넌트
+  
+- **US3 삭제 실행 및 Langfuse 추적**
+  - ChromaDB에서 영구 삭제 (`delete_by_id`)
+  - 삭제 속도: < 2초 (중소 규모 데이터셋)
+  - 관찰 가능성: Langfuse trace 기록 (qa_id, admin_user, latency_ms)
+  - 오류 처리: 6가지 분류 (not_found, db_connection_error, network_error, timeout, db_operation_error, unknown_error)
+  
+- **US4 삭제 상태 메시지**
+  - 진행: "삭제 중..." (toast)
+  - 성공: "✓ 삭제되었습니다" (목록 자동 갱신)
+  - 실패: "❌ 삭제 실패했습니다 - [원인]"
+  - 페이지 자동 조정: 마지막 항목 삭제 시 Page 1 리셋
+
+#### 기술 기반
+
+- **서비스 계층**
+  - `QADeleteService`: 삭제 로직 + Langfuse 추적
+  - `QAListService`: 관리자 목록 조회 (페이지네이션 10개 고정)
+  
+- **데이터 모델**
+  - `QADeleteRequest`: 삭제 요청 (qa_id, admin_user, timestamp)
+  - `QADeleteResult`: 삭제 응답 (success, message, error_reason)
+  - `QAListRequest`/`QAListResponse`: 목록 조회 계약
+  
+- **UI 컴포넌트**
+  - `admin_list_tab.py`: 관리자 목록 조회 UI + 삭제 버튼/다이얼로그
+  - 상태 관리: Gradio State (`deletion_state`, `current_page`)
+  - 보안: HTML escape (`html.escape`, `json.dumps`)
+
+#### 테스트 (156개 추가, 총 250개)
+
+- **계약 테스트 (15개)**
+  - `test_chromadb_delete.py`: ChromaDB 삭제 API 계약 (15개)
+    - 기본 동작: 삭제 성공, 반환값 검증
+    - 오류 처리: not_found, empty_string, None, permission_error, timeout
+    - 동시성: idempotent (멱등성), permanent (영구성)
+  
+- **통합 테스트 (9개)**
+  - `test_admin_delete_flow.py`: 전체 삭제 플로우 (9개)
+    - end-to-end: 버튼 → 다이얼로그 → 삭제 → 갱신
+    - 페이지 리셋: 마지막 항목 삭제 시 Page 1 이동
+    - 상태 메시지: 진행/성공/실패 toast
+    - 동시 삭제: first-wins Optimistic 처리
+  
+- **단위 테스트 (132개)**
+  - `test_qa_delete_service.py`: 삭제 서비스 로직 (50개)
+  - `test_qa_list_service.py`: 목록 조회 서비스 (42개)
+  - `test_admin_list_tab.py`: UI 컴포넌트 (40개)
+
+#### 문서
+
+- **specs/002-delete-qa-item/**
+  - `spec.md`: 요구사항 명세 (9개 시나리오)
+  - `plan.md`: 기술 계획 (헌법 검수, 프로젝트 구조)
+  - `research.md`: 기술 결정 (삭제 전략, UI, 보안)
+  - `data-model.md`: 엔티티 정의 (QADeleteRequest, QADeleteResult)
+  - `tasks.md`: 구현 작업 분해 (46개 작업, 7단계)
+  - `quickstart.md`: 수동 검증 시나리오 (4가지 + 엣지 케이스)
+  - `contracts/`: UI/서비스 계약 (4개 파일)
+
+### 변경됨
+
+- `admin_list_tab.py`: 목록 조회 UI 재구성 (테이블 → HTML + 버튼)
+- `main.py`: 관리자 탭에 `admin_list_tab` 통합
+- `conftest.py`: 삭제 관련 fixture 추가 (`qa_delete_service`)
+
+### 보안 강화
+
+- XSS 방지: `json.dumps` + `html.escape` 이중 이스케이핑
+- CSRF 방지: 관리자 인증 플래그 (`admin_logged_in`) 체크
+- 권한 검증: 모든 삭제 작업에서 로그인 상태 확인
+
+### 성능
+
+- 삭제 완료: < 2초 (중소 규모 데이터셋)
+- 목록 갱신: < 1초 (페이지당 10개)
+- 테스트 실행: 250개 14.71초 ✅
+
+### 엣지 케이스 검증 (7개)
+
+- EC-001: 페이지 새로고침 중 삭제 (Gradio SPA 제약사항)
+- EC-002: 동시 삭제 → "항목을 찾을 수 없습니다" 오류
+- EC-003: 네트워크 오류 → "네트워크 오류가 발생했습니다" 메시지
+- EC-004: ChromaDB 응답 없음 → 타임아웃 처리
+- EC-005: 항목 1개만 → 삭제 후 빈 상태 표시
+- EC-006: 페이지 2 마지막 항목 → Page 1 리셋
+- EC-007: 버튼 중복 클릭 → Gradio 이벤트 큐 자동 방지
+
+### 고려사항 (Known Issues)
+
+- 삭제 실행 취소 (Undo) 기능 없음 (향후 계획)
+- 대량 일괄 삭제 미지원 (1개씩만 삭제)
+
+### 의존성
+
+```
+Python>=3.12
+gradio>=4.26.0
+chromadb>=0.4.24
+langfuse>=2.12.0
+pytest>=9.0.0
+python-dotenv>=1.0.0
+langchain>=0.0.300
+```
+
+---
+
 ## [1.0.0] - 2026-03-03 (MVP 릴리스)
 
 ### 추가됨

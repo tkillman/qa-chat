@@ -147,14 +147,20 @@ def render_qa_cards(items: List[QAListItem], visible: bool = True) -> Tuple[str,
     
     for idx, item in enumerate(items):
         qa_id_js = json.dumps(item.id)
+        # 단순화: 숨겨진 텍스트박스 값 변경만 수행 (Gradio가 change 이벤트 감지)
         onclick_js = (
             "try{"
             f"const qaId={qa_id_js};"
             "let hiddenInput=document.getElementById('hidden-qa-id');"
-            "if(hiddenInput){hiddenInput.value=qaId;hiddenInput.dispatchEvent(new Event('input',{bubbles:true}));hiddenInput.dispatchEvent(new Event('change',{bubbles:true}));}"
-            "let triggerBtn=document.getElementById('hidden-open-delete-trigger');"
-            "if(triggerBtn){const btn=triggerBtn.querySelector('button');if(btn){btn.click();}}"
-            "}catch(e){console.error('delete error',e);}"
+            "if(hiddenInput){"
+            "const inputEl=(hiddenInput.matches&&hiddenInput.matches('input,textarea'))?hiddenInput:hiddenInput.querySelector('input,textarea');"
+            "if(inputEl){"
+            "inputEl.value=qaId;"
+            "inputEl.dispatchEvent(new Event('input',{bubbles:true,composed:true}));"
+            "inputEl.dispatchEvent(new Event('change',{bubbles:true,composed:true}));"
+            "}"
+            "}"
+            "}catch(e){console.error('delete button error:',e);}"
         )
         onclick_attr = html_module.escape(onclick_js, quote=True)
 
@@ -454,8 +460,9 @@ def create_admin_list_tab():
             outputs=[qa_list_html, page_info, total_items_md, current_page]
         )
 
-        # 숨겨진 오픈 트리거 버튼 클릭 시 확인 다이얼로그 열기
-        hidden_open_delete_trigger.click(
+        # 숨겨진 텍스트박스의 change 이벤트에 확인 다이얼로그 열기 연결
+        # (HTML 버튼의 onclick에서 hidden_qa_id 값 변경 → Gradio가 자동 감지)
+        hidden_qa_id.change(
             fn=open_delete_dialog,
             inputs=[hidden_qa_id, deletion_state],
             outputs=[delete_confirm_dialog, selected_qa_md, deletion_state],

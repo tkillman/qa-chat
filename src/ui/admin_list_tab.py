@@ -147,7 +147,6 @@ def render_qa_cards(items: List[QAListItem], visible: bool = True) -> Tuple[str,
             "if(triggerBtn){setTimeout(()=>triggerBtn.click(),50);}else{console.error('Trigger button not found');}"
             "}catch(e){console.error('delete bridge error',e);}"
         )
-        onclick_attr = html_module.escape(onclick_js, quote=True)
 
         # HTML 이스케이프 처리
         question_html = item.question.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
@@ -171,7 +170,7 @@ def render_qa_cards(items: List[QAListItem], visible: bool = True) -> Tuple[str,
                         </span>
                     </div>
                     <button type="button" 
-                            onclick="{onclick_attr}"
+                            onclick='{onclick_js}'
                             title="삭제"
                             style="border: 1px solid #fecaca; background: #fff1f2; color: #be123c;
                                    border-radius: 6px; padding: 6px 10px; font-size: 12px;

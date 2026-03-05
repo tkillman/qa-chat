@@ -1,7 +1,7 @@
 """Cache models for Phase 7 performance optimization."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List, Optional
 import hashlib
 
@@ -41,14 +41,14 @@ class CacheEntry:
         return cls(
             key=key,
             embedding=embedding,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
             question_text=question
         )
     
     def record_access(self):
         """접근 기록 (히트 증가)"""
         self.access_count += 1
-        self.last_accessed = datetime.utcnow()
+        self.last_accessed = datetime.now(UTC)
     
     def to_dict(self) -> dict:
         """직렬화"""

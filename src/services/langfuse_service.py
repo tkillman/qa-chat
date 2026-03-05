@@ -163,7 +163,15 @@ class LangfuseService:
             **(context or {})
         })
     
-    def log_qa_deleted(self, qa_id: str, admin_user: str, timestamp: Any) -> None:
+    def log_qa_deleted(
+        self,
+        qa_id: str,
+        admin_user: str,
+        timestamp: Any,
+        success: bool = True,
+        error_reason: Optional[str] = None,
+        latency_ms: Optional[float] = None,
+    ) -> None:
         """Q&A 항목 삭제 추적 (Feature 002)
         
         Args:
@@ -172,11 +180,13 @@ class LangfuseService:
             timestamp: 삭제 시간
         """
         self.log_event("qa_deleted", {
-            "event_type": "qa_deleted",
+            "event_type": "qa_delete",
             "qa_id": qa_id,
             "admin_user": admin_user,
             "timestamp": str(timestamp),
-            "success": True
+            "success": success,
+            "error_reason": error_reason,
+            "latency_ms": round(latency_ms, 2) if latency_ms is not None else None,
         })
     
     def log_performance(self, operation: str, duration_ms: float) -> None:

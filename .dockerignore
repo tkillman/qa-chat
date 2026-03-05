@@ -48,6 +48,7 @@ docs/
 .env
 .env.local
 .env.*.local
+.env*
 
 # Project specific
 *.log

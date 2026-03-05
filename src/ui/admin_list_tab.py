@@ -152,10 +152,11 @@ def render_qa_cards(items: List[QAListItem], visible: bool = True) -> Tuple[str,
             f"const qaId={qa_id_js};"
             "let hiddenInput=document.getElementById('hidden-qa-id');"
             "if(hiddenInput){hiddenInput.value=qaId;hiddenInput.dispatchEvent(new Event('input',{bubbles:true}));hiddenInput.dispatchEvent(new Event('change',{bubbles:true}));}"
-            "let triggerBtn=document.getElementById('hidden-instant-delete-trigger');"
+            "let triggerBtn=document.getElementById('hidden-open-delete-trigger');"
             "if(triggerBtn){const btn=triggerBtn.querySelector('button');if(btn){btn.click();}}"
             "}catch(e){console.error('delete error',e);}"
         )
+        onclick_attr = html_module.escape(onclick_js, quote=True)
 
         # HTML 이스케이프 처리
         question_html = item.question.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
@@ -179,7 +180,7 @@ def render_qa_cards(items: List[QAListItem], visible: bool = True) -> Tuple[str,
                 </td>
                 <td style="padding: 12px; text-align: center; vertical-align: middle; white-space: nowrap;">
                     <button type="button" 
-                            onclick="{onclick_js}"
+                            onclick="{onclick_attr}"
                             title="삭제"
                             style="border: 1px solid #fecaca; background: #fff1f2; color: #be123c;
                                    border-radius: 4px; padding: 6px 10px; font-size: 12px;
@@ -261,10 +262,10 @@ def create_admin_list_tab():
                 container=False,
                 label=""
             )
-            hidden_instant_delete_trigger = gr.Button(
-                value="instant-delete-trigger",
+            hidden_open_delete_trigger = gr.Button(
+                value="open-delete-trigger",
                 visible=True,
-                elem_id="hidden-instant-delete-trigger",
+                elem_id="hidden-open-delete-trigger",
                 elem_classes=["delete-hidden-bridge"],
             )
             
@@ -318,7 +319,7 @@ def create_admin_list_tab():
                     return html, "페이지 1/1", "오류 발생", 1
             
             # 초기 데이터 로드
-            initial_html, initial_page_info, initial_total, initial_page = load_list(1, 50)
+            initial_html, initial_page_info, initial_total, initial_page = load_list(1, 10)
             
             # 목록 표시 영역 (초기값 포함)
             qa_list_html = gr.HTML(value=initial_html)
@@ -358,11 +359,11 @@ def create_admin_list_tab():
             return gr.update(visible=False), gr.update(value=""), _default_deletion_state()
 
         def confirm_delete(state: Dict[str, Any], page: int):
-            """삭제 실행 후 목록 갱신 (50개 고정)"""
+            """삭제 실행 후 목록 갱신 (10개 고정)"""
             selected_qa_id = state.get("selected_qa_id") if state else None
             if not selected_qa_id:
                 gr.Error("삭제할 항목을 찾을 수 없습니다")
-                html, page_text, total_text, current = load_list(page, 50)
+                html, page_text, total_text, current = load_list(page, 10)
                 return (
                     html,
                     page_text,
@@ -379,12 +380,12 @@ def create_admin_list_tab():
 
             if result.success:
                 gr.Info("✓ 삭제되었습니다")
-                refreshed_view = service.list_items(page=page, items_per_page=50)
+                refreshed_view = service.list_items(page=page, items_per_page=10)
                 target_page = page
                 if page > 1 and len(refreshed_view.items) == 0:
                     target_page = 1
 
-                html, page_text, total_text, current = load_list(target_page, 50)
+                html, page_text, total_text, current = load_list(target_page, 10)
                 return (
                     html,
                     page_text,
@@ -396,7 +397,7 @@ def create_admin_list_tab():
                 )
 
             gr.Error(f"❌ 삭제 실패했습니다 - {result.message}")
-            html, page_text, total_text, current = load_list(page, 50)
+            html, page_text, total_text, current = load_list(page, 10)
             failed_state = {
                 **_default_deletion_state(),
                 "show_dialog": True,
@@ -411,53 +412,30 @@ def create_admin_list_tab():
                 gr.update(value=f"선택된 항목 ID: `{selected_qa_id}`"),
                 failed_state,
             )
-
-        def instant_delete(qa_id: str, page: int):
-            """확인 다이얼로그 없이 즉시 삭제 실행"""
-            if not qa_id or not qa_id.strip():
-                gr.Error("삭제할 항목을 찾을 수 없습니다")
-                html, page_text, total_text, current = load_list(page, 50)
-                return html, page_text, total_text, current, _default_deletion_state()
-
-            request = QADeleteRequest(qa_id=qa_id, admin_user="admin")
-            result = delete_service.delete_qa_item(request)
-
-            if result.success:
-                gr.Info("✓ 삭제되었습니다")
-                refreshed_view = service.list_items(page=page, items_per_page=50)
-                target_page = page
-                if page > 1 and len(refreshed_view.items) == 0:
-                    target_page = 1
-                html, page_text, total_text, current = load_list(target_page, 50)
-                return html, page_text, total_text, current, _default_deletion_state()
-
-            gr.Error(f"❌ 삭제 실패했습니다 - {result.message}")
-            html, page_text, total_text, current = load_list(page, 50)
-            return html, page_text, total_text, current, _default_deletion_state()
         
         # 상태 초기값 설정
-        items_per_page.value = 50
+        items_per_page.value = 10
         current_page.value = 1
         
         # 탭 활성 시 새로고침
         def on_tab_select():
             """탭 활성화 시 목록 새로고침"""
-            return load_list(1, 50)
+            return load_list(1, 10)
         
         # 이벤트 핸들러 등록
-        # refresh_btn.click (50개 고정)
+        # refresh_btn.click (10개 고정)
         def refresh_fixed():
-            return load_list(1, 50)
+            return load_list(1, 10)
         
         refresh_btn.click(
             fn=refresh_fixed,
             outputs=[qa_list_html, page_info, total_items_md, current_page]
         )
         
-        # go_next (50개 고정)
+        # go_next (10개 고정)
         def go_next_fixed(page: int):
             next_page = page + 1
-            return load_list(next_page, 50)
+            return load_list(next_page, 10)
         
         next_btn.click(
             fn=go_next_fixed,
@@ -465,10 +443,10 @@ def create_admin_list_tab():
             outputs=[qa_list_html, page_info, total_items_md, current_page]
         )
         
-        # go_prev (50개 고정)
+        # go_prev (10개 고정)
         def go_prev_fixed(page: int):
             prev_page = max(1, page - 1)
-            return load_list(prev_page, 50)
+            return load_list(prev_page, 10)
         
         prev_btn.click(
             fn=go_prev_fixed,
@@ -476,11 +454,11 @@ def create_admin_list_tab():
             outputs=[qa_list_html, page_info, total_items_md, current_page]
         )
 
-        # 숨겨진 즉시 삭제 트리거 버튼 클릭 시 바로 삭제 실행
-        hidden_instant_delete_trigger.click(
-            fn=instant_delete,
-            inputs=[hidden_qa_id, current_page],
-            outputs=[qa_list_html, page_info, total_items_md, current_page, deletion_state],
+        # 숨겨진 오픈 트리거 버튼 클릭 시 확인 다이얼로그 열기
+        hidden_open_delete_trigger.click(
+            fn=open_delete_dialog,
+            inputs=[hidden_qa_id, deletion_state],
+            outputs=[delete_confirm_dialog, selected_qa_md, deletion_state],
         )
 
         delete_confirm_no.click(

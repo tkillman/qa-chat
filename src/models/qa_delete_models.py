@@ -5,7 +5,7 @@ Q&A 항목 삭제 기능 - 데이터 모델 (Phase 2: Foundational)
 - 모든 모델은 검증 규칙과 타입 안전성을 제공합니다
 """
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Optional
 
 
@@ -28,7 +28,7 @@ class QADeleteRequest:
     """
     qa_id: str
     admin_user: str
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     
     def validate(self) -> bool:
         """요청 유효성 검증 (data-model.md 검증 규칙)
@@ -91,7 +91,7 @@ class QADeleteResult:
     qa_id: str
     message: str
     error_reason: Optional[str] = None
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     
     # 허용된 error_reason 값 (data-model.md: 오류 분류 코드)
     VALID_ERROR_REASONS = {

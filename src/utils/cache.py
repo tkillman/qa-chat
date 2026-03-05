@@ -167,8 +167,8 @@ class LRUCache:
     @staticmethod
     def _get_utc_now():
         """UTC 현재시간 반환 (테스트 용이성을 위해 별도 메서드)"""
-        from datetime import datetime
-        return datetime.utcnow()
+        from datetime import datetime, UTC
+        return datetime.now(UTC)
     
     def _estimate_memory_usage(self) -> float:
         """

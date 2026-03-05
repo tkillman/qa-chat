@@ -180,7 +180,7 @@ class QADeleteService:
         
         # 항목 없음
         if "notfound" in error_lower or "존재하지 않음" in error_lower or "찾을 수 없" in error_lower:
-            return "not_found", "항목을 찾을 수 없습니다"
+            return "not_found", "Q&A 항목을 찾을 수 없습니다"
         
         # DB 연결 오류
         if "connection" in error_lower or "연결" in error_lower:
@@ -195,7 +195,7 @@ class QADeleteService:
             return "db_operation_error", "데이터베이스 작업 실패"
         
         # 기타 오류
-        return "unknown_error", "알 수 없는 오류가 발생했습니다"
+        return "unknown_error", "Q&A 항목 삭제 중 오류가 발생했습니다"
 
 
 _qa_delete_service_instance: Optional[QADeleteService] = None

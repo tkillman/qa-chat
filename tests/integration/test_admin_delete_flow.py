@@ -84,7 +84,7 @@ class TestAdminDeleteFlow:
         
         # 토스트 알림 메시지는 프론트엔드에서 처리
         assert result.success is True
-        assert "성공" in result.message
+        assert "삭제" in result.message
     
     def test_delete_with_concurrent_request(
         self, qa_delete_service, mock_chromadb, mock_langfuse
@@ -132,7 +132,7 @@ class TestAdminDeleteFlow:
         )
         result = qa_delete_service.delete_qa_item(request)
         assert result.success is True
-        assert "성공" in result.message
+        assert "삭제" in result.message
         
         # 실패 메시지
         mock_chromadb.delete.side_effect = Exception("DB 오류")

@@ -107,7 +107,7 @@ def _build_delete_choices(items: List[QAListItem]) -> List[Tuple[str, str]]:
 
 
 def render_qa_cards(items: List[QAListItem], visible: bool = True) -> Tuple[str, bool]:
-    """QA 항목들을 카드 형식 HTML로 렌더링
+    """QA 항목들을 테이블 형식 HTML로 렌더링
     
     Args:
         items: QAListItem 리스트
@@ -125,87 +125,78 @@ def render_qa_cards(items: List[QAListItem], visible: bool = True) -> Tuple[str,
         '''
         return html, False
     
-    # 카드 HTML 생성
+    # 테이블 시작
     html = '''
-    <div style="display: flex; flex-direction: column; gap: 16px; max-height: 600px; overflow-y: auto; padding-right: 10px;">
+    <div style="overflow-x: auto; max-height: 700px; overflow-y: auto;">
+    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+        <thead style="background: #f0f4f8; position: sticky; top: 0; z-index: 10;">
+            <tr>
+                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #d0d0d0; font-weight: 600; color: #2c3e50; width: 40%;">
+                    ❓ 질문
+                </th>
+                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #d0d0d0; font-weight: 600; color: #2c3e50; width: 45%;">
+                    ✅ 답변
+                </th>
+                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #d0d0d0; font-weight: 600; color: #2c3e50; width: 15%;">
+                    작업
+                </th>
+            </tr>
+        </thead>
+        <tbody>
     '''
     
-    for item in items:
+    for idx, item in enumerate(items):
         qa_id_js = json.dumps(item.id)
         onclick_js = (
             "try{"
             f"const qaId={qa_id_js};"
-            "let hiddenInput=null;"
-            "const exact=document.getElementById('hidden-qa-id');"
-            "if(exact){hiddenInput=(exact.tagName==='TEXTAREA'||exact.tagName==='INPUT')?exact:exact.querySelector('textarea,input[type=text],input:not([type])');}"
-            "if(!hiddenInput){const cands=document.querySelectorAll('[id*=hidden-qa-id]');for(const el of cands){const input=(el.tagName==='TEXTAREA'||(el.tagName==='INPUT'&&(el.type==='text'||!el.type)))?el:el.querySelector('textarea,input[type=text],input:not([type])');if(input){hiddenInput=input;break;}}}"
+            "let hiddenInput=document.getElementById('hidden-qa-id');"
             "if(hiddenInput){hiddenInput.value=qaId;hiddenInput.dispatchEvent(new Event('input',{bubbles:true}));hiddenInput.dispatchEvent(new Event('change',{bubbles:true}));}"
-            "let triggerBtn=null;"
-            "const t=document.getElementById('hidden-instant-delete-trigger');"
-            "if(t){triggerBtn=t.tagName==='BUTTON'?t:t.querySelector('button');}"
-            "if(!triggerBtn){const tc=document.querySelectorAll('[id*=hidden-instant-delete-trigger]');for(const el of tc){const btn=el.tagName==='BUTTON'?el:el.querySelector('button');if(btn){triggerBtn=btn;break;}}}"
-            "if(triggerBtn){setTimeout(()=>triggerBtn.click(),50);}else{console.error('Trigger button not found');}"
-            "}catch(e){console.error('delete bridge error',e);}"
+            "let triggerBtn=document.getElementById('hidden-instant-delete-trigger');"
+            "if(triggerBtn){const btn=triggerBtn.querySelector('button');if(btn){btn.click();}}"
+            "}catch(e){console.error('delete error',e);}"
         )
 
         # HTML 이스케이프 처리
         question_html = item.question.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
         answer_html = item.answer.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
         
-        card = f'''
-        <div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; 
-                    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); 
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-                    transition: box-shadow 0.3s ease;">
-            
-            <div style="margin-bottom: 14px;">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 12px;">
-                    <div style="display: flex; align-items: baseline; min-width: 0;">
-                        <strong style="color: #2563eb; font-size: 14px; font-weight: 600; 
-                                       text-transform: uppercase; letter-spacing: 0.5px;">
-                            ❓ 질문
-                        </strong>
-                        <span style="color: #999; font-size: 12px; margin-left: 8px;">
-                            ID: {item.id[:8]}...
-                        </span>
-                    </div>
+        # 한 줄로 표시되도록 길이 제한
+        question_preview = question_html[:100] + '...' if len(question_html) > 100 else question_html
+        answer_preview = answer_html[:150] + '...' if len(answer_html) > 150 else answer_html
+        
+        # 짝수/홀수 행 배경색
+        row_bg = '#ffffff' if idx % 2 == 0 else '#f9fafb'
+        
+        row = f'''
+            <tr style="background: {row_bg}; border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 12px; vertical-align: top; max-width: 0; word-break: break-word; font-family: monospace; color: #333;">
+                    {question_preview}
+                    <div style="font-size: 11px; color: #999; margin-top: 4px;">ID: {item.id[:12]}...</div>
+                </td>
+                <td style="padding: 12px; vertical-align: top; max-width: 0; word-break: break-word; font-family: monospace; color: #333;">
+                    {answer_preview}
+                </td>
+                <td style="padding: 12px; text-align: center; vertical-align: middle; white-space: nowrap;">
                     <button type="button" 
-                            onclick='{onclick_js}'
+                            onclick="{onclick_js}"
                             title="삭제"
                             style="border: 1px solid #fecaca; background: #fff1f2; color: #be123c;
-                                   border-radius: 6px; padding: 6px 10px; font-size: 12px;
-                                   font-weight: 600; white-space: nowrap; cursor: pointer;
-                                   transition: all 0.2s;">
+                                   border-radius: 4px; padding: 6px 10px; font-size: 12px;
+                                   font-weight: 600; cursor: pointer; transition: all 0.2s;
+                                   hover: background: #fee2e2;">
                         🗑️ 삭제
                     </button>
-                </div>
-                <div style="max-height: 120px; overflow-y: auto; margin-top: 8px;
-                            padding: 10px; background: white; border-radius: 4px;
-                            border-left: 3px solid #2563eb; font-family: monospace;
-                            font-size: 13px; line-height: 1.5; color: #333;">
-                    {question_html}
-                </div>
-            </div>
-            
-            <div>
-                <div style="display: flex; align-items: baseline; margin-bottom: 8px;">
-                    <strong style="color: #059669; font-size: 14px; font-weight: 600;
-                                   text-transform: uppercase; letter-spacing: 0.5px;">
-                        ✅ 답변
-                    </strong>
-                </div>
-                <div style="max-height: 180px; overflow-y: auto; margin-top: 8px;
-                            padding: 10px; background: white; border-radius: 4px;
-                            border-left: 3px solid #059669; font-family: monospace;
-                            font-size: 13px; line-height: 1.6; color: #333;">
-                    {answer_html}
-                </div>
-            </div>
-        </div>
+                </td>
+            </tr>
         '''
-        html += card
+        html += row
     
-    html += '</div>'
+    html += '''
+        </tbody>
+    </table>
+    </div>
+    '''
     return html, True
 
 

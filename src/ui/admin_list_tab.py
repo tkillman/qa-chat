@@ -6,6 +6,7 @@ Gradio를 사용하여 관리자가 등록된 Q&A 항목을 페이징하여 조�
 import gradio as gr
 import logging
 import json
+import html as html_module
 from typing import List, Tuple, Optional, Dict, Any
 from dataclasses import dataclass, field, asdict
 
@@ -146,6 +147,7 @@ def render_qa_cards(items: List[QAListItem], visible: bool = True) -> Tuple[str,
             "if(triggerBtn){setTimeout(()=>triggerBtn.click(),50);}else{console.error('Trigger button not found');}"
             "}catch(e){console.error('delete bridge error',e);}"
         )
+        onclick_attr = html_module.escape(onclick_js, quote=True)
 
         # HTML 이스케이프 처리
         question_html = item.question.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
@@ -169,7 +171,7 @@ def render_qa_cards(items: List[QAListItem], visible: bool = True) -> Tuple[str,
                         </span>
                     </div>
                     <button type="button" 
-                            onclick="{onclick_js}"
+                            onclick="{onclick_attr}"
                             title="삭제"
                             style="border: 1px solid #fecaca; background: #fff1f2; color: #be123c;
                                    border-radius: 6px; padding: 6px 10px; font-size: 12px;

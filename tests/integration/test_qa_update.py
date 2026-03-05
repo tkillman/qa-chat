@@ -145,7 +145,8 @@ class TestQAUpdateIntegration:
 
         restarted_app = QAChatApp()
         restarted_app.admin_logged_in = True
-        answer, similarity = restarted_app.search_answer("Restart Q")
+        result_gen = restarted_app.search_answer("Restart Q")
+        answer = list(result_gen)[-1]
 
         assert "New Answer" in answer or answer == "답변을 찾을 수 없습니다"
 

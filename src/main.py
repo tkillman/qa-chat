@@ -88,16 +88,12 @@ class QAChatApp:
                     interactive=False,
                     lines=3,
                 )
-                similarity_output = gr.Number(
-                    label="유사도",
-                    interactive=False,
-                )
                 
-                # 검색 버튼 클릭 시 동작 (US4에서 구현)
+                # 검색 버튼 클릭 시 동작 (스트리밍 반응, 한글자씩)
                 search_btn.click(
                     fn=self.search_answer,
                     inputs=[user_question],
-                    outputs=[answer_output, similarity_output]
+                    outputs=[answer_output]
                 )
             
             with gr.Tab("관리자"):
@@ -115,7 +111,8 @@ class QAChatApp:
                 
                 # 관리자 패널 (로그인 후 표시)
                 with gr.Group(visible=False) as admin_panel:
-                    with gr.Tabs():
+                    admin_tabs = gr.Tabs()
+                    with admin_tabs:
                         # Tab 1: Q&A 관리
                         with gr.Tab("✏️ Q&A 관리"):
                             gr.Markdown("### Q&A 항목 추가/수정")
@@ -144,7 +141,15 @@ class QAChatApp:
                             )
                         
                         # Tab 2: 목록 조회 (새로 추가)
-                        create_admin_list_tab()
+                        list_tab = create_admin_list_tab()
+                    
+                    # 탭 선택 시 목록 탭이 선택되면 새로고침 트리거
+                    if list_tab and len(list_tab) >= 6:
+                        # hidden_refresh_trigger 값 변경으로 새로고침 트리거
+                        admin_tabs.select(
+                            fn=lambda: list_tab[5].update(value="refresh"),
+                            outputs=[list_tab[5]]
+                        )
                 
                 # 로그인 버튼 클릭 시 동작
                 login_btn.click(
@@ -186,15 +191,13 @@ class QAChatApp:
         try:
             # 입력값 검증
             if not question or not question.strip():
-                msg = "질문을 입력해주세요"
-                logger.warning("User search with empty question")
-                return msg, 0.0
+                yield "질문을 입력해주세요"
+                return
             
             # 길이 제한 검증 (FR-009)
             if len(question) > MAX_USER_QUESTION_LENGTH:
-                msg = f"질문은 {MAX_USER_QUESTION_LENGTH}자 이내여야 합니다"
-                logger.warning("User search question too long")
-                return msg, 0.0
+                yield f"질문은 {MAX_USER_QUESTION_LENGTH}자 이내여야 합니다"
+                return
 
             # 사용자 검색 서비스 호출
             results = self.user_search_service.search_qa(question)
@@ -203,15 +206,19 @@ class QAChatApp:
                 # 첫 번째 결과 반환 (최대 1개)
                 result = results[0]
                 answer = result.get('answer', '답변을 찾을 수 없습니다')
-                similarity = result.get('similarity', 0.0)
                 
-                logger.info(f"User search successful: '{question[:50]}...' -> similarity: {similarity}")
-                return answer, similarity
+                logger.info(f"User search successful: '{question[:50]}...'")
+                
+                # 스트리밍: 한 글자씩 yield (마치 타이핑하듯)
+                accumulated = ""
+                for char in answer:
+                    accumulated += char
+                    yield accumulated
             else:
                 # 결과 없음
                 msg = "답변을 찾을 수 없습니다"
                 logger.info(f"No results for user question: '{question[:50]}...'")
-                return msg, 0.0
+                yield msg
                 
         except Exception as e:
             error_msg = "검색 중 오류가 발생했습니다."
@@ -220,7 +227,7 @@ class QAChatApp:
                 error_type="user_search_ui_failed",
                 error_message=str(e)
             )
-            return error_msg, 0.0
+            yield error_msg
     
     def admin_login(self, password: str) -> tuple:
         """관리자 로그인 (US2 - 패스워드 검증)

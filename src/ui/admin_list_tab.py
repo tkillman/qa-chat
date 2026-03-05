@@ -340,7 +340,11 @@ def create_admin_list_tab():
             # 전체 항목 수 표시
             total_items_md = gr.Markdown(initial_total)
             
-            # 숨겨진 새로고침 트리거 (탭 활성화 시 자동 reload)\n            hidden_refresh_trigger = gr.Textbox(\n                visible=False,\n                elem_id="admin-list-refresh-trigger"\n            )
+            # 숨겨진 새로고침 트리거 (탭 활성화 시 자동 reload)
+            hidden_refresh_trigger = gr.Textbox(
+                visible=False,
+                elem_id="admin-list-refresh-trigger"
+            )
 
         
         def open_delete_dialog(qa_id: str, state: Dict[str, Any]):

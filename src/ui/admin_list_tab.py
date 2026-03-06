@@ -224,6 +224,40 @@ def render_empty_message(message: str) -> str:
     '''
 
 
+def load_list_from_source(service, page: int, per_page: int) -> Tuple[str, str, str, int]:
+    """정본 저장소 기준 목록 로드 공통 함수
+
+    Args:
+        service: 목록 조회 서비스 인스턴스
+        page: 페이지 번호
+        per_page: 페이지당 항목 수
+
+    Returns:
+        (카드 HTML, 페이지 정보, 총 항목 수 텍스트, 현재 페이지)
+    """
+    try:
+        view_state = service.list_items(page=page, items_per_page=per_page)
+
+        if view_state.has_error():
+            html = render_empty_message(view_state.get_display_message())
+            return html, "페이지 1/1", "오류 발생", 1
+
+        if view_state.is_empty:
+            html = render_empty_message(view_state.get_display_message())
+            return html, "페이지 1/1", "총 0개의 항목", 1
+
+        html, _ = render_qa_cards(view_state.items, visible=True)
+        page_info_text = view_state.pagination.get_page_info_text()
+        total_items_text = view_state.pagination.get_total_items_text()
+
+        return html, page_info_text, total_items_text, page
+
+    except Exception as e:
+        logger.error(f"목록 로드 실패: {e}", exc_info=True)
+        html = render_empty_message(f"목록 로드 중 오류 발생: {str(e)}")
+        return html, "페이지 1/1", "오류 발생", 1
+
+
 def create_admin_list_tab():
     """관리자 목록 조회 탭 생성
     
@@ -233,7 +267,7 @@ def create_admin_list_tab():
     service = get_qa_list_service()
     delete_service = get_qa_delete_service()
     
-    with gr.Tab("📋 목록 조회"):
+    with gr.Tab("📋 목록 조회") as list_tab:
         # 숨겨진 브리지용 스타일 정의
         gr.HTML('''
         <style>
@@ -288,44 +322,14 @@ def create_admin_list_tab():
                     delete_confirm_yes = gr.Button("예", variant="stop")
                     delete_confirm_no = gr.Button("아니오", variant="secondary")
             
-            # 초기 로드 함수 (컴포넌트 생성 전에 정의)
             def load_list(page: int, per_page: int) -> Tuple[str, str, str, int]:
-                """목록 로드 함수
-                
-                Args:
-                    page: 페이지 번호
-                    per_page: 페이지당 항목 수
-                    
-                Returns:
-                    (카드 HTML, 페이지 정보, 총 항목 수 텍스트, 현재 페이지)
-                """
-                try:
-                    view_state = service.list_items(page=page, items_per_page=per_page)
-                    
-                    if view_state.has_error():
-                        # 오류 상태
-                        html = render_empty_message(view_state.get_display_message())
-                        return html, "페이지 1/1", "오류 발생", 1
-                    
-                    if view_state.is_empty:
-                        # 빈 목록
-                        html = render_empty_message(view_state.get_display_message())
-                        return html, "페이지 1/1", "총 0개의 항목", 1
-                    
-                    # 정상 표시
-                    html, _ = render_qa_cards(view_state.items, visible=True)
-                    page_info_text = view_state.pagination.get_page_info_text()
-                    total_items_text = view_state.pagination.get_total_items_text()
-                    
-                    return html, page_info_text, total_items_text, page
-                    
-                except Exception as e:
-                    logger.error(f"목록 로드 실패: {e}", exc_info=True)
-                    html = render_empty_message(f"목록 로드 중 오류 발생: {str(e)}")
-                    return html, "페이지 1/1", "오류 발생", 1
+                return load_list_from_source(service, page, per_page)
             
-            # 초기 데이터 로드
-            initial_html, initial_page_info, initial_total, initial_page = load_list(1, 10)
+            # 초기 데이터는 placeholder로 두고, 탭 선택 시 정본 저장소에서 조회
+            initial_html = render_empty_message("목록을 불러오는 중입니다...")
+            initial_page_info = "페이지 1/1"
+            initial_total = "총 0개의 항목"
+            initial_page = 1
             
             # 목록 표시 영역 (초기값 포함)
             qa_list_html = gr.HTML(value=initial_html)
@@ -340,12 +344,6 @@ def create_admin_list_tab():
             # 전체 항목 수 표시
             total_items_md = gr.Markdown(initial_total)
             
-            # 숨겨진 새로고침 트리거 (탭 활성화 시 자동 reload)
-            hidden_refresh_trigger = gr.Textbox(
-                visible=False,
-                elem_id="admin-list-refresh-trigger"
-            )
-
         
         def open_delete_dialog(qa_id: str, state: Dict[str, Any]):
             """삭제 확인 다이얼로그 열기 (카드 버튼에서 호출)"""
@@ -494,10 +492,9 @@ def create_admin_list_tab():
             ],
         )
         
-        # 숨겨진 새로고침 트리거: 변경 시 목록 새로고침 (탭 활성화 시 해금될 예정)
-        hidden_refresh_trigger.change(
+        list_tab.select(
             fn=on_tab_select,
             outputs=[qa_list_html, page_info, total_items_md, current_page]
         )
         
-        return qa_list_html, page_info, total_items_md, current_page, on_tab_select, hidden_refresh_trigger
+        return qa_list_html, page_info, total_items_md, current_page

@@ -214,16 +214,8 @@ class QAChatApp:
                                 outputs=[add_status]
                             )
                         
-                        # Tab 2: 목록 조회 (새로 추가)
-                        list_tab = create_admin_list_tab()
-                    
-                    # 탭 선택 시 목록 탭이 선택되면 새로고침 트리거
-                    if list_tab and len(list_tab) >= 6:
-                        # hidden_refresh_trigger 값 변경으로 새로고침 트리거
-                        admin_tabs.select(
-                            fn=lambda: list_tab[5].update(value="refresh"),
-                            outputs=[list_tab[5]]
-                        )
+                        # Tab 2: 목록 조회
+                        create_admin_list_tab()
                 
                 # 로그인 버튼 클릭 시 동작
                 login_btn.click(

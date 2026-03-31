@@ -49,8 +49,6 @@ htmlcov/
 .hypothesis/
 
 # ChromaDB (벡터 저장소 - 배포 시 초기화)
-.chroma/
-.chromadb/
 
 # OS
 .DS_Store
@@ -58,15 +56,11 @@ Thumbs.db
 *.tmp
 
 # Project specific
-.chroma/
 .env
 .env.local
 .env.*.local
 debug_search.py
 .specify/
-# ChromaDB
-.chroma/
-chroma_data/
 *.db
 
 # Environment

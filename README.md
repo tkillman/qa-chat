@@ -12,6 +12,7 @@ short_description: chat-test
 ---
 
 Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
+
 # QA Chat 🤖
 
 Gradio 기반 대화형 Q&A 챗봇 애플리케이션입니다. 사용자는 질문을 입력하여 답변을 검색하고, 관리자는 Q&A 데이터를 관리할 수 있습니다.
@@ -37,15 +38,15 @@ Gradio 기반 대화형 Q&A 챗봇 애플리케이션입니다. 사용자는 질
 
 ## 기술 스택
 
-| 항목 | 기술 |
-|------|------|
-| **언어** | Python 3.12+ |
-| **UI** | Gradio 4.26.0+ |
-| **벡터 DB** | ChromaDB 0.4.24+ |
-| **관찰성** | Langfuse 2.12.0+ |
-| **테스트** | pytest 7.4.3+ |
-| **환경 관리** | python-dotenv 1.0.0+ |
-| **임베딩** | LangChain (HuggingFace기본) |
+| 항목          | 기술                        |
+| ------------- | --------------------------- |
+| **언어**      | Python 3.12+                |
+| **UI**        | Gradio 4.26.0+              |
+| **벡터 DB**   | ChromaDB 0.4.24+            |
+| **관찰성**    | Langfuse 2.12.0+            |
+| **테스트**    | pytest 7.4.3+               |
+| **환경 관리** | python-dotenv 1.0.0+        |
+| **임베딩**    | LangChain (HuggingFace기본) |
 
 ---
 
@@ -70,18 +71,21 @@ cd qa-chat
 ### 2. 가상 환경 생성 및 활성화
 
 **Windows (PowerShell)**:
+
 ```powershell
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 ```
 
 **Windows (CMD)**:
+
 ```cmd
 python -m venv venv
 venv\Scripts\activate.bat
 ```
 
 **macOS/Linux**:
+
 ```bash
 python -m venv venv
 source venv/bin/activate
@@ -136,11 +140,11 @@ LOG_LEVEL=INFO
 
 ### 환경 변수 설명
 
-| 변수 | 기본값 | 설명 |
-|------|-------|------|
-| `ADMIN_PASSWORD` | `1234` | 관리자 로그인 패스워드 |
-| `SIMILARITY_THRESHOLD` | `0.7` | 검색 결과 유사도 임계값 (0~1) |
-| `LOG_LEVEL` | `INFO` | 로깅 레벨 (DEBUG, INFO, WARNING, ERROR) |
+| 변수                   | 기본값 | 설명                                    |
+| ---------------------- | ------ | --------------------------------------- |
+| `ADMIN_PASSWORD`       | `1234` | 관리자 로그인 패스워드                  |
+| `SIMILARITY_THRESHOLD` | `0.7`  | 검색 결과 유사도 임계값 (0~1)           |
+| `LOG_LEVEL`            | `INFO` | 로깅 레벨 (DEBUG, INFO, WARNING, ERROR) |
 
 > **⚠️ 주의**: `ADMIN_PASSWORD`는 개발 환경에서만 사용. 운영 환경에서는 더 강력한 인증 방식 사용 필수.
 >
@@ -212,6 +216,7 @@ python -c "from src.main import QAChatApp; import asyncio; app = QAChatApp(); as
    - Owner 선택 > 저장소 이름 입력 > Space 생성
 
 2. **저장소 설정 (README.md 메타데이터)**
+
    ```yaml
    ---
    title: QA Chat
@@ -225,9 +230,11 @@ python -c "from src.main import QAChatApp; import asyncio; app = QAChatApp(); as
    license: mit
    ---
    ```
+
    > 현재 README.md 상단에 이미 설정되어 있습니다.
 
 3. **코드 푸시**
+
    ```bash
    git remote add huggingface https://huggingface.co/spaces/{username}/{space-name}
    git push huggingface main
@@ -240,6 +247,7 @@ python -c "from src.main import QAChatApp; import asyncio; app = QAChatApp(); as
      ADMIN_PASSWORD=<strong-password>
      SIMILARITY_THRESHOLD=0.7
      LANGFUSE_API_KEY=<your-api-key> (선택사항)
+     RESET_CHROMA_ON_STARTUP=false
      ```
 
 5. **배포 확인**
@@ -249,6 +257,7 @@ python -c "from src.main import QAChatApp; import asyncio; app = QAChatApp(); as
 ### 배포 후 데이터 관리
 
 **데이터 초기화:**
+
 - `data/init.txt`에 Q&A 데이터 추가
 - 다음 포맷으로 저장 (JSON Lines):
   ```json
@@ -257,18 +266,35 @@ python -c "from src.main import QAChatApp; import asyncio; app = QAChatApp(); as
   ```
 
 **지속성:**
+
 - ChromaDB 데이터는 Space 재시작 시 초기화됨
 - 영구 저장을 위해 HF datasets 또는 외부 DB 연동 필요
+
+### 이전 데이터로 오염된 경우 (데이터 초기화)
+
+**증상**: 배포 후 새로운 init.txt 데이터가 로드되지 않고 이전 답변이 계속 나옴
+
+**해결 방법**:
+
+1. Space 설정에서 `RESET_CHROMA_ON_STARTUP=true`로 설정
+2. Space를 재시작하면 `.chroma/` 디렉토리가 완전히 초기화됨
+3. 새로운 `data/init.txt` 데이터가 로드됨
+4. **중요**: 재시작 후 다시 `RESET_CHROMA_ON_STARTUP=false`로 변경 (일회성 초기화)
+
+> `.chroma/` 디렉토리는 `.gitignore`에 등록되어 있으므로 git에 포함되지 않습니다.
 
 ### 트러블슈팅
 
 **문제**: 관리자 기능이 작동하지 않음
+
 - **해결**: Secrets에서 `ADMIN_PASSWORD` 올바르게 설정 확인
 
 **문제**: 데이터가 로드되지 않음
+
 - **해결**: `data/init.txt` 파일 존재 및 형식 확인 (JSON Lines)
 
 **문제**: 느린 응답 속도
+
 - **해결**: 서버 스펙 업그레이드 또는 유사도 임계값 조정
 
 ---
@@ -431,6 +457,7 @@ qa-chat/
 ### 데이터 흐름
 
 **사용자 질문 검색**:
+
 ```
 사용자 입력
    ↓
@@ -448,6 +475,7 @@ Langfuse 로깅
 ```
 
 **관리자 Q&A 추가**:
+
 ```
 관리자 입력 + 로그인 확인
    ↓
@@ -524,12 +552,17 @@ langfuse.log_user_search(
 **A**: `data/init.txt` 파일에 줄 단위 JSON 형식으로 저장됩니다.
 
 ```json
-{"question": "What is Python?", "answer": "A programming language", "metadata": {}}
+{
+  "question": "What is Python?",
+  "answer": "A programming language",
+  "metadata": {}
+}
 ```
 
 ### Q: 검색 정확도를 개선하려면?
 
 **A**: `.env`에서 `SIMILARITY_THRESHOLD` 값을 조정하세요:
+
 - `0.7` (기본): 엄격한 필터링
 - `0.6`: 더 많은 결과
 - `0.8`: 더 정확한 결과
@@ -559,13 +592,13 @@ rmdir /s /q .chroma\  # Windows
 
 ## 성능 지표
 
-| 작업 | 예상 시간 |
-|------|---------|
-| 앱 시작 | ~2초 |
-| 100개 Q&A 초기 로드 | ~50ms |
-| 사용자 검색 쿼리 | ~100-200ms |
-| 관리자 Q&A 추가 | ~150-300ms |
-| 테스트 전체 실행 | ~8초 (94개) |
+| 작업                | 예상 시간   |
+| ------------------- | ----------- |
+| 앱 시작             | ~2초        |
+| 100개 Q&A 초기 로드 | ~50ms       |
+| 사용자 검색 쿼리    | ~100-200ms  |
+| 관리자 Q&A 추가     | ~150-300ms  |
+| 테스트 전체 실행    | ~8초 (94개) |
 
 ---
 
@@ -573,12 +606,12 @@ rmdir /s /q .chroma\  # Windows
 
 **전체 테스트**: 94개 ✅
 
-| 카테고리 | 개수 | 상태 |
-|---------|------|------|
-| 단위 테스트 (Unit) | 48개 | ✅ Pass |
-| 통합 테스트 (Integration) | 30개 | ✅ Pass |
-| 계약 테스트 (Contract) | 16개 | ✅ Pass |
-| **총합** | **94개** | **✅ Pass** |
+| 카테고리                  | 개수     | 상태        |
+| ------------------------- | -------- | ----------- |
+| 단위 테스트 (Unit)        | 48개     | ✅ Pass     |
+| 통합 테스트 (Integration) | 30개     | ✅ Pass     |
+| 계약 테스트 (Contract)    | 16개     | ✅ Pass     |
+| **총합**                  | **94개** | **✅ Pass** |
 
 ---
 
@@ -660,6 +693,7 @@ pre-commit install
 ## 변경 이력
 
 **v1.0.0** (2026-03-03)
+
 - MVP 릴리스
 - 4개 사용자 스토리 구현 완료
 - 94개 테스트 통과
@@ -668,8 +702,8 @@ pre-commit install
 
 **마지막 업데이트**: 2026-03-03
 
-Happy Coding! 🚀
----
+## Happy Coding! 🚀
+
 title: Chat Test
 emoji: 🚀
 colorFrom: gray
@@ -680,6 +714,7 @@ app_file: app.py
 pinned: false
 license: mit
 short_description: chat-test
+
 ---
 
 Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference

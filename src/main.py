@@ -4,6 +4,7 @@ QA Chat 메인 애플리케이션 - Gradio UI
 """
 import os
 import sys
+import shutil
 
 if __package__ is None or __package__ == "":
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -49,6 +50,18 @@ class QAChatApp:
         Spec US1: 앱 실행 시 init.txt의 데이터를 ChromaDB에 로드
         """
         logger.info("=== QA Chat Application Started ===")
+        
+        # HF Spaces에서 초기화가 필요한 경우 (배포 시 이전 .chroma 데이터 제거)
+        # 환경 변수 RESET_CHROMA_ON_STARTUP=true로 제어 가능
+        if os.getenv('RESET_CHROMA_ON_STARTUP', 'false').lower() == 'true':
+            logger.info("Resetting ChromaDB (RESET_CHROMA_ON_STARTUP=true)")
+            chroma_dir = os.getenv('CHROMA_PERSIST_DIR', '.chroma')
+            if os.path.exists(chroma_dir):
+                try:
+                    shutil.rmtree(chroma_dir)
+                    logger.info(f"Removed {chroma_dir} directory")
+                except Exception as e:
+                    logger.error(f"Failed to remove {chroma_dir}: {e}")
         
         try:
             num_items, duration_ms, success = self.init_loader.load_initial_data()

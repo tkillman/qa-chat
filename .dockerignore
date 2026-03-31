@@ -48,6 +48,10 @@ docs/
 .env
 .env.local
 .env.*.local
+
+# ChromaDB (벡터 저장소 - 배포 시 초기화)
+.chroma/
+.chromadb/
 .env*
 
 # Project specific
